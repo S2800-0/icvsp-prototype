@@ -14,7 +14,7 @@ This repository holds the two working prototypes:
 | Component | Status |
 |---|---|
 | Trust & consensus engine (schema checks, plausibility, trust, consensus, Sybil / replay defence, targeting) | ✅ Prototype, 39 tests, evaluated in simulation |
-| Pothole / speed-bump detector (camera, YOLO11n) | ✅ Baseline trained and evaluated on public data |
+| Pothole / speed-bump detector (camera, YOLO11n) | ✅ Trained and evaluated on public data (v1: mAP50 0.825) |
 | Egyptian road test set | 🟡 Clips being recorded by the team |
 | IMU bump confirmation, V2V (ESP32), cloud, in-vehicle hardware | ⏳ Planned (see roadmap) |
 
@@ -36,40 +36,40 @@ charts and method: [`engine/results/summary.md`](engine/results/summary.md) and 
 Run it (plain Python 3.10+, no dependencies): `cd engine && python3 -m icvsp.demo all` for the seven scenarios
 (single report, duplicates, false report, Sybil, cloud outage, replay, GPS spoofing), and `python3 -m unittest` for the tests.
 
-## Detector: first results on a public test set (1,104 unseen images)
+## Detector: results on a public test set (1,104 unseen images)
 
-Baseline `v0_public_merge`: YOLO11n, 50 epochs, 640 px, trained on the public
-[SBP-YOLO dataset](https://github.com/chuanqi1997/SBP-YOLO) after near-duplicate removal.
+YOLO11n trained on the public [SBP-YOLO dataset](https://github.com/chuanqi1997/SBP-YOLO) after near-duplicate removal.
+Current best: `v1_e150` (150 epochs, 640 px); baseline `v0_public_merge` (50 epochs) for comparison.
 
-| Class | Precision | Recall | mAP50 |
+| Class | v0 precision / recall | **v1 precision / recall** | v1 mAP50 |
 |---|---|---|---|
-| Speed bump | 0.89 | 0.86 | 0.90 |
-| Pothole | 0.82 | 0.60 | 0.69 |
-| **Overall** | | | **0.795** |
+| Speed bump | 0.89 / 0.86 | **0.92 / 0.89** | 0.93 |
+| Pothole | 0.82 / 0.60 | **0.83 / 0.65** | 0.72 |
+| **Overall mAP50** | 0.795 | **0.825** (+0.030) | |
 
-<p align="center"><img src="ai/results/v0_public_merge/test_confusion_matrix_normalized.png" width="520" alt="Normalised confusion matrix on the public test set"></p>
+<p align="center"><img src="ai/results/v1_e150/test_confusion_matrix_normalized.png" width="520" alt="Normalised confusion matrix of v1 on the public test set"></p>
 
 **What we learned**
-- **Speed bumps** already exceed our pre-set acceptance threshold (recall ≥ 0.75, precision ≥ 0.70) on
-  public data. Whether that holds on **Egyptian** roads is the open question; the Egyptian test set decides it.
-- **Potholes** are harder: most misses are small, distant potholes, and most false alarms are pothole-like
-  patches or shadows. The two classes are never confused with each other. This supports the design choice
-  to confirm camera detections with the IMU and with reports from other vehicles, rather than trusting the camera alone.
-- **Duplicates:** 676 near-duplicate images (9%) were removed before training, including training images
-  that duplicated test images, so our test numbers are not inflated by leakage.
-- **Learning curve:** validation mAP50 rose 0.695 → 0.744 → 0.764 → 0.784 at 25/50/75/100% of the data, and
-  the model was still improving at the last epoch. Longer training (150 epochs) and larger input images
-  (960 px) are the next experiments.
+- **Speed bumps** exceed our pre-set acceptance threshold (recall ≥ 0.75, precision ≥ 0.70) on public data; only 6 % are
+  missed. Whether that holds on **Egyptian** roads is the open question; the Egyptian test set decides it.
+- **Potholes** remain harder: 27 % are missed (mostly small, distant ones) and most false alarms are pothole-like patches or
+  shadows. The two classes are never confused with each other. This supports confirming camera detections with the IMU and
+  with reports from other vehicles rather than trusting the camera alone.
+- **Longer training has reached its limit:** v1's best epoch was 139 of 150 and validation accuracy was nearly flat after
+  epoch 100. The next experiment is larger input images (960 px) for small potholes.
+- **Duplicates:** 676 near-duplicate images (9 %) were removed before training, including training images that duplicated
+  test images, so our test numbers are not inflated by leakage.
+- **Learning curve** (v0 setup): validation mAP50 0.695 → 0.744 → 0.764 → 0.784 at 25/50/75/100 % of the data.
 
 The full experiment log, updated after every run, is in [`ai/results/experiments.md`](ai/results/experiments.md).
 
 ## Try it
 
-- **Reproduce training:** open [`ai/ICVSP_train.ipynb`](ai/ICVSP_train.ipynb) in
-  [Google Colab](https://colab.research.google.com) (free T4 GPU). It needs no Google Drive access and
-  downloads the public dataset itself.
-- **Use the trained model:** [`ai/models/v0_public_merge.pt`](ai/models/v0_public_merge.pt), for example
-  `python ai/scripts/predict_clips.py --weights ai/models/v0_public_merge.pt` on your own dash-cam clips.
+- **Reproduce training:** [`ai/ICVSP_train_kaggle.ipynb`](ai/ICVSP_train_kaggle.ipynb) runs unattended on Kaggle (recommended for
+  long runs); [`ai/ICVSP_train.ipynb`](ai/ICVSP_train.ipynb) is the interactive Google Colab version. Neither needs Google Drive
+  access; both download the public dataset themselves.
+- **Use the trained model:** [`ai/models/v1_e150.pt`](ai/models/v1_e150.pt) (best so far; `v0_public_merge.pt` is the baseline), for example
+  `python ai/scripts/predict_clips.py --weights ai/models/v1_e150.pt` on your own dash-cam clips.
 
 Details, including how to record and label the Egyptian test set, are in [`ai/README.md`](ai/README.md).
 

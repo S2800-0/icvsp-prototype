@@ -37,7 +37,17 @@ ai/
    names, and `configs/classes.yaml` assumes 0 = pothole, 1 = speed bump.
 5. Run the last cell to download `icvsp_results.zip` before closing. Colab deletes everything at the end of the session.
 
-After editing any script or config here, run `python scripts/build_notebook.py` to regenerate the notebook.
+**Long runs (v1, v2): use Kaggle instead.** Free Colab can cut off a multi-hour run when its GPU quota runs out.
+`ICVSP_train_kaggle.ipynb` runs unattended on Kaggle (about 30 GPU hours per week, 12 hours per run) and keeps its outputs:
+1. [kaggle.com](https://www.kaggle.com) → **Create → New Notebook → File → Import Notebook** → choose `ai/ICVSP_train_kaggle.ipynb`.
+2. Right panel → *Session options*: **Accelerator GPU T4 x2**, **Internet On** (needs a phone-verified account).
+3. Set `EXPERIMENT` in the Settings cell, then **Save Version → Save & Run All (Commit)**. You can close the browser.
+4. When it finishes, download `icvsp_results.zip` from the version's **Output** tab.
+
+If a run is cut off, attach that version's output (*Add Input → Your Work*), set `RESUME_FROM` to its `last.pt`, and
+commit again: training continues from the last saved epoch (`scripts/train.py --resume`).
+
+After editing any script or config here, run `python scripts/build_notebook.py` to regenerate both notebooks.
 
 Optional extra sources: download them in YOLO format into their own folder under `data/raw/`
 (e.g. `data/raw/indian_roads/`). The merge picks up every folder automatically.

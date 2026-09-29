@@ -4,6 +4,8 @@ Defaults are sized for a 16 GB Apple-silicon laptop (MPS). On Colab, pass --devi
 
 Usage:  python scripts/train.py [--model yolo11n.pt] [--epochs 50] [--fraction 1.0]
         --fraction < 1.0 trains on a random subset (used for the learning curve).
+        --resume runs/<name>/weights/last.pt continues an interrupted run where it stopped
+        (same dataset path and runs folder as the original run, e.g. a later Kaggle session).
 """
 import argparse
 from pathlib import Path
@@ -25,7 +27,12 @@ def main():
     ap.add_argument('--device', default='mps' if torch.backends.mps.is_available() else 'cpu')
     ap.add_argument('--patience', type=int, default=15, help='stop early after this many epochs without improvement')
     ap.add_argument('--name', default=None)
+    ap.add_argument('--resume', default=None, help="an interrupted run's last.pt; all other options come from it")
     a = ap.parse_args()
+
+    if a.resume:
+        YOLO(a.resume).train(resume=True)
+        return
 
     name = a.name or f'{Path(a.model).stem}_e{a.epochs}_f{int(a.fraction * 100)}'
     YOLO(a.model).train(

@@ -1,5 +1,6 @@
 run,model,epochs,imgsz,data_fraction,epochs_run,best_epoch,val_mAP50,val_mAP50_95,test_mAP50,test_pothole_P,test_pothole_R,test_pothole_mAP50,test_speed_bump_P,test_speed_bump_R,test_speed_bump_mAP50,decision
 v0_public_merge,yolo11n,50,640,1.0,50,50,0.78438,0.45831,0.795,0.821,0.6,0.688,0.892,0.859,0.902,"PENDING: no Egyptian test set yet (see README, step 3)"
+v1_e150,yolo11n,150,640,1.0,150,139,0.81696,0.4802,0.825,0.829,0.652,0.723,0.919,0.893,0.927,"PENDING: no Egyptian test set yet (see README, step 3)"
 yolo11n_e50_f25,yolo11n,50,640,0.25,50,50,0.69517,0.35819,,,,,,,,
 yolo11n_e50_f50,yolo11n,50,640,0.5,50,50,0.74426,0.41414,,,,,,,,
 yolo11n_e50_f75,yolo11n,50,640,0.75,50,50,0.76439,0.43234,,,,,,,,
