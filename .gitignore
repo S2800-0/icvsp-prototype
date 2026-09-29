@@ -1,0 +1,15 @@
+# datasets and team recordings (large, licensed separately, or personal: faces / plates)
+ai/data/raw/
+ai/data/merged/
+ai/data/egypt_test/clips/
+ai/data/egypt_test/frames/
+ai/data/egypt_test/test/
+
+# raw training outputs; curated copies live in ai/results/ and ai/models/
+ai/runs/
+*.zip
+
+__pycache__/
+*.pyc
+.DS_Store
+.ipynb_checkpoints/

@@ -1,0 +1,21 @@
+# Unified class scheme for the ICVSP road-hazard detector.
+# Every source dataset is remapped onto these IDs by scripts/merge_datasets.py.
+classes:
+  0: pothole
+  1: speed_bump
+
+# Source class names are matched case-insensitively against these regexes.
+# A source class that matches nothing is dropped (its boxes are removed, the image is kept).
+mapping:
+  pothole: 'pothole|pot[_ -]?hole|d40'
+  speed_bump: 'speed[_ -]?(bump|breaker|hump)|^bump|hump|breaker|speedbump'
+
+# Classes that must never be mapped even if a regex above matches them.
+exclude: 'rumble|crack|d00|d10|d20|manhole'
+
+# Class names for sources that ship without a data.yaml, keyed by folder name under data/raw/.
+sources:
+  # SBP-YOLO has no data.yaml. Roboflow exports number classes alphabetically, so 0 = pothole,
+  # 1 = speed bump is the likely order. VERIFY with the "check class IDs" cell in the notebook.
+  sbp_yolo:
+    names: [pothole, speed_bump]
