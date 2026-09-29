@@ -1,0 +1,40 @@
+{
+  "runs": 2000,
+  "seed": 2026,
+  "tpr": 0.85,
+  "fpr": 0.05,
+  "config": {
+    "max_future_s": 2.0,
+    "max_age_s": {
+      "pothole": 172800
+    },
+    "max_acc_m": 30.0,
+    "good_acc_m": 5.0,
+    "max_speed_kmh": 250.0,
+    "max_trace_speed_mps": 70.0,
+    "sender_match_dt_s": 5.0,
+    "sender_max_offset_m": 40.0,
+    "freshness_tau_s": {
+      "pothole": 21600
+    },
+    "prior_good": 1.0,
+    "prior_bad": 3.0,
+    "merge_radius_m": 10.0,
+    "heading_tol_deg": 45.0,
+    "pass_radius_m": 12.0,
+    "pass_window_s": 60.0,
+    "pass_confidence": 0.9,
+    "lam": 0.8,
+    "sybil_max_sep_m": 2.0,
+    "sybil_min_overlap": 3,
+    "confirm_net": 1.2,
+    "corroborate_net": 0.6,
+    "unconfirmed_net": 0.3,
+    "cold_start_advisory": true,
+    "cold_start_min_c": 0.8,
+    "cold_start_min_g": 0.8,
+    "expire_freshness": 0.1,
+    "warn_horizon_m": 500.0,
+    "active_window_s": 5.0
+  }
+}
