@@ -19,3 +19,7 @@ sources:
   # 1 = speed bump is the likely order. VERIFY with the "check class IDs" cell in the notebook.
   sbp_yolo:
     names: [pothole, speed_bump]
+
+# Sources made of video frames are split by video, never by frame (see merge_datasets.py).
+# background_* folders hold hazard-free images (e.g. night reflections) and need no labels.
+video_sources: '^(egypt|youtube|background)'

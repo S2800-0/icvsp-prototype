@@ -17,11 +17,17 @@ ai/
 │   ├── evaluate.py          # public + Egyptian test, applies the decision rule
 │   ├── predict_clips.py     # draws the model's boxes on Egyptian clips (visual check)
 │   ├── compare_runs.py      # builds results/experiments.md comparing all runs
-│   └── extract_frames.py    # phone clips → frames for labelling
+│   ├── extract_frames.py    # phone clips → frames for labelling
+│   ├── event_recall.py      # scores a clip against a list of bump / pothole timestamps
+│   ├── check_events.py      # contact sheets of the model's boxes just before each event
+│   ├── harvest_frames.py    # picks the frames worth labelling from long drives (train videos only)
+│   └── make_night.py        # synthetic night copies of daytime training images
 ├── data/
 │   ├── raw/                 # one sub-folder per source dataset (YOLO format)
 │   ├── merged/              # created by merge_datasets.py
-│   └── egypt_test/          # the team's clips, frames and labelled test set
+│   ├── egypt_test/          # the team's clips, frames and labelled test set
+│   ├── videos/              # long drives + videos.csv (train/test split per video); private
+│   └── label_queue/         # harvested frames waiting for CVAT; private
 ├── runs/                    # raw training and evaluation outputs (from icvsp_results.zip)
 └── results/                 # experiment log + confusion matrices per run (for the thesis)
 ```
@@ -95,9 +101,35 @@ boxes drawn on them. This shows what it detects but not what it misses, so it is
 
 The thresholds are fixed in `scripts/evaluate.py` before testing, so the decision stays honest.
 
+## Step 5: Egyptian + night fine-tune (v3)
+
+The first Egyptian tests showed two gaps: **night** (streetlight reflections on wet roads are taken
+for speed bumps) and **Egyptian bumps** (often unpainted). Public data does not cover either, so v3
+fine-tunes v2 on Egyptian frames instead of merging more foreign datasets.
+
+1. **Videos.** Put long drives in `data/videos/` and list each one in `data/videos/videos.csv` with
+   `split` = `train` or `test`. **Split by video, never by frame**, and keep the test videos away from
+   any labelling. `cairo_yt_01` (the Cairo night video with the team's timestamps) is test.
+   YouTube drives are for private experiments only: never commit or publish their frames.
+2. **Harvest.** `python scripts/harvest_frames.py` keeps the frames where v2 fires plus a random
+   sample (about 250 per 10-minute video), then `python scripts/prelabel.py --weights models/v2_e150_960.pt
+   --imgsz 960 --frames data/label_queue` pre-labels them for CVAT.
+3. **Label in CVAT.** Correct every frame. Deleting a wrong box on a reflection turns that frame into a
+   **hard negative**, which is exactly what the model needs. Target: 300–500 frames, about a third at
+   night, plus 100–200 hazard-free night frames as `background_*`.
+4. **Train on Kaggle.** Upload the exports as the **private** dataset `icvsp-egypt-train`
+   (`youtube_*.zip`, `egypt_*.zip`, `background_*.zip`) and run the notebook with `EXPERIMENT = 'v3_egypt_night'`.
+   The notebook also adds synthetic night copies of 30 % of the daytime images (`make_night.py`;
+   check the look with `python scripts/make_night.py --preview 12`).
+5. **Test** on the held-out videos: `predict_clips.py` + `event_recall.py` against the timestamps, with
+   `check_events.py` to see where the boxes really are, and on the public test set to make sure
+   daytime accuracy did not drop.
+
 ## Licences
 
 - SBP-YOLO repository: GPL-3.0. Cite Liang et al., *J. Real-Time Image Processing* 23, 52 (2026).
 - RDD2022: CC BY 4.0. Mapillary images: CC BY-SA 4.0.
 - Ultralytics YOLO: AGPL-3.0 (fine for the graduation project).
+- YouTube driving videos: used privately to test the approach, not redistributed; not part of any
+  published dataset or paper figure. For the paper, the team's own recordings replace them.
 - Blur faces and number plates before publishing any Egyptian images (Egypt PDPL, Law 151/2020).

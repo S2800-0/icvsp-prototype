@@ -10,6 +10,15 @@ the script:
 Splits: a source's own test split is kept as test, so results stay comparable with the
 source paper; everything else is re-split train/val 85/15 per source.
 
+Video-derived sources (folder name matching `video_sources` in classes.yaml, e.g. egypt_*,
+youtube_*, background_*) are split by VIDEO, not by frame: neighbouring frames of one drive are
+near-copies, so splitting them by frame would leak the validation set into training.
+A frame's video is its file name without the trailing frame number (<video>_0042.jpg).
+
+Background sources (folder name starting with background_) hold images with no hazards,
+e.g. wet roads and streetlight reflections. They need no labels: every image gets an empty
+label file, which teaches the model what is NOT a bump.
+
 Usage:  python scripts/merge_datasets.py [--raw data/raw] [--out data/merged]
 """
 import argparse, hashlib, json, random, re, shutil
@@ -31,6 +40,8 @@ def load_scheme():
 
 
 def source_names(src: Path):
+    if src.name.lower().startswith('background'):
+        return []
     override = (yaml.safe_load((ROOT / 'configs/classes.yaml').read_text()).get('sources') or {}).get(src.name)
     if override:
         return list(override['names'])
@@ -68,6 +79,10 @@ def dhash(path, size=8):
     return int(bits, 2)
 
 
+def video_of(img: Path):
+    return re.sub(r'_\d+$', '', img.stem)
+
+
 def split_of(img: Path):
     parts = {p.lower() for p in img.parts}
     if 'test' in parts:
@@ -98,6 +113,7 @@ def main():
     args = ap.parse_args()
     random.seed(args.seed)
     names, rules, exclude = load_scheme()
+    video_rx = re.compile(yaml.safe_load((ROOT / 'configs/classes.yaml').read_text()).get('video_sources', '$^'), re.I)
 
     if args.out.exists():
         shutil.rmtree(args.out)
@@ -140,12 +156,26 @@ def main():
                         rep['dropped_boxes'] += 1
             pending.append((img, lines, split_of(img)))
 
-        # re-split non-test images 85/15 per source
+        # re-split non-test images 85/15 per source (per video for video-derived sources)
         rest = [x for x in pending if x[2] != 'test']
-        random.shuffle(rest)
-        n_val = round(0.15 * len(rest))
-        final = [(i, l, 'val') for i, l, _ in rest[:n_val]] + [(i, l, 'train') for i, l, _ in rest[n_val:]] \
-            + [x for x in pending if x[2] == 'test']
+        if video_rx.search(src.name):
+            groups = defaultdict(list)
+            for x in rest:
+                groups[video_of(x[0])].append(x)
+            keys = sorted(groups)
+            random.shuffle(keys)
+            val_keys, n = set(), 0
+            for k in keys:                      # fill val with whole videos up to ~15 %
+                if n >= 0.15 * len(rest) or len(val_keys) == len(keys) - 1:
+                    break
+                val_keys.add(k); n += len(groups[k])
+            final = [(i, l, 'val' if video_of(i) in val_keys else 'train') for i, l, _ in rest]
+            rep['videos'] = {'train': len(keys) - len(val_keys), 'val': len(val_keys)}
+        else:
+            random.shuffle(rest)
+            n_val = round(0.15 * len(rest))
+            final = [(i, l, 'val') for i, l, _ in rest[:n_val]] + [(i, l, 'train') for i, l, _ in rest[n_val:]]
+        final += [x for x in pending if x[2] == 'test']
 
         tag = re.sub(r'[^a-z0-9]+', '_', src.name.lower())
         for img, lines, split in final:

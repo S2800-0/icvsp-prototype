@@ -13,3 +13,8 @@ __pycache__/
 *.pyc
 .DS_Store
 .ipynb_checkpoints/
+
+# private driving videos (YouTube, team) and frames waiting to be labelled
+ai/data/videos/
+ai/data/label_queue/
+ai/data/egypt_test/external/
