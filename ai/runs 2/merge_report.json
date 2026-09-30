@@ -1,0 +1,35 @@
+{
+  "sources": {
+    "sbp_yolo": {
+      "source_classes": [
+        "pothole",
+        "speed_bump"
+      ],
+      "mapping": {
+        "pothole": "pothole",
+        "speed_bump": "speed_bump"
+      },
+      "images": 7375,
+      "kept": 6699,
+      "dropped_boxes": 0
+    }
+  },
+  "duplicates_removed": 676,
+  "counts": {
+    "val": {
+      "pothole": 1353,
+      "images": 839,
+      "speed_bump": 369
+    },
+    "train": {
+      "speed_bump": 2185,
+      "images": 4756,
+      "pothole": 7237
+    },
+    "test": {
+      "speed_bump": 495,
+      "images": 1104,
+      "pothole": 1752
+    }
+  }
+}

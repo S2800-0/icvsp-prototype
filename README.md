@@ -14,7 +14,7 @@ This repository holds the two working prototypes:
 | Component | Status |
 |---|---|
 | Trust & consensus engine (schema checks, plausibility, trust, consensus, Sybil / replay defence, targeting) | ✅ Prototype, 39 tests, evaluated in simulation |
-| Pothole / speed-bump detector (camera, YOLO11n) | ✅ Trained and evaluated on public data (v1: mAP50 0.825) |
+| Pothole / speed-bump detector (camera, YOLO11n) | ✅ Trained and evaluated on public data (v2: mAP50 0.837) |
 | Egyptian road test set | 🟡 Clips being recorded by the team |
 | IMU bump confirmation, V2V (ESP32), cloud, in-vehicle hardware | ⏳ Planned (see roadmap) |
 
@@ -39,15 +39,15 @@ Run it (plain Python 3.10+, no dependencies): `cd engine && python3 -m icvsp.dem
 ## Detector: results on a public test set (1,104 unseen images)
 
 YOLO11n trained on the public [SBP-YOLO dataset](https://github.com/chuanqi1997/SBP-YOLO) after near-duplicate removal.
-Current best: `v1_e150` (150 epochs, 640 px); baseline `v0_public_merge` (50 epochs) for comparison.
+Best accuracy: `v2_e150_960` (150 epochs, 960 px). `v1_e150` (640 px) is about 2.25× cheaper per frame; the in-vehicle speed benchmark decides which one runs on the unit. `v0_public_merge` (50 epochs) is the baseline.
 
-| Class | v0 precision / recall | **v1 precision / recall** | v1 mAP50 |
+| Class | v0 P / R (mAP50) | v1 P / R (mAP50) | **v2 P / R (mAP50)** |
 |---|---|---|---|
-| Speed bump | 0.89 / 0.86 | **0.92 / 0.89** | 0.93 |
-| Pothole | 0.82 / 0.60 | **0.83 / 0.65** | 0.72 |
-| **Overall mAP50** | 0.795 | **0.825** (+0.030) | |
+| Speed bump | 0.89 / 0.86 (0.90) | 0.92 / 0.89 (0.93) | **0.90 / 0.90 (0.93)** |
+| Pothole | 0.82 / 0.60 (0.69) | 0.83 / 0.65 (0.72) | **0.82 / 0.68 (0.75)** |
+| **Overall mAP50** | 0.795 | 0.825 (+0.030) | **0.837** (+0.042) |
 
-<p align="center"><img src="ai/results/v1_e150/test_confusion_matrix_normalized.png" width="520" alt="Normalised confusion matrix of v1 on the public test set"></p>
+<p align="center"><img src="ai/results/v2_e150_960/test_confusion_matrix_normalized.png" width="520" alt="Normalised confusion matrix of v2 on the public test set"></p>
 
 **What we learned**
 - **Speed bumps** exceed our pre-set acceptance threshold (recall ≥ 0.75, precision ≥ 0.70) on public data; only 6 % are
@@ -56,7 +56,9 @@ Current best: `v1_e150` (150 epochs, 640 px); baseline `v0_public_merge` (50 epo
   shadows. The two classes are never confused with each other. This supports confirming camera detections with the IMU and
   with reports from other vehicles rather than trusting the camera alone.
 - **Longer training has reached its limit:** v1's best epoch was 139 of 150 and validation accuracy was nearly flat after
-  epoch 100. The next experiment is larger input images (960 px) for small potholes.
+  epoch 100.
+- **Larger images help small potholes, at a cost:** v2 (960 px) raises pothole recall from 0.65 to 0.68 and mAP50 from
+  0.72 to 0.75, but needs about 2.25× the computation per frame. Speed bumps barely change.
 - **Duplicates:** 676 near-duplicate images (9 %) were removed before training, including training images that duplicated
   test images, so our test numbers are not inflated by leakage.
 - **Learning curve** (v0 setup): validation mAP50 0.695 → 0.744 → 0.764 → 0.784 at 25/50/75/100 % of the data.
@@ -68,7 +70,8 @@ The full experiment log, updated after every run, is in [`ai/results/experiments
 - **Reproduce training:** [`ai/ICVSP_train_kaggle.ipynb`](ai/ICVSP_train_kaggle.ipynb) runs unattended on Kaggle (recommended for
   long runs); [`ai/ICVSP_train.ipynb`](ai/ICVSP_train.ipynb) is the interactive Google Colab version. Neither needs Google Drive
   access; both download the public dataset themselves.
-- **Use the trained model:** [`ai/models/v1_e150.pt`](ai/models/v1_e150.pt) (best so far; `v0_public_merge.pt` is the baseline), for example
+- **Use the trained models:** [`ai/models/v2_e150_960.pt`](ai/models/v2_e150_960.pt) (most accurate; run with `--imgsz 960`) or
+  [`ai/models/v1_e150.pt`](ai/models/v1_e150.pt) (faster), for example
   `python ai/scripts/predict_clips.py --weights ai/models/v1_e150.pt` on your own dash-cam clips.
 
 Details, including how to record and label the Egyptian test set, are in [`ai/README.md`](ai/README.md).
