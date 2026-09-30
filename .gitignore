@@ -16,8 +16,9 @@ __pycache__/
 
 # private driving videos (YouTube, team) and frames waiting to be labelled
 ai/data/videos/
-ai/data/label_queue/
+ai/data/label_queue*/
+ai/data/tags/
 ai/data/egypt_test/external/
 ai/data/reviewed/
-ai/data/egypt_test/prelabels/
+ai/data/egypt_test/prelabels*/
 ai/data/review.csv

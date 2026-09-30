@@ -122,6 +122,12 @@ fine-tunes v2 on Egyptian frames instead of merging more foreign datasets.
    `python scripts/apply_review.py review.csv --name youtube_batch1` writes three zips to `data/reviewed/`.
    Only the **E** frames go to CVAT. **N** frames become hard negatives ("a reflection is not a bump"),
    which is exactly what the model needs. Target: 300–500 frames, about a third at night.
+   **More bumps:** the model rarely fires on Egyptian bumps, so step 2 finds few of them. Watch each
+   training video in review.html (*Video* tab), press **B** at every bump and **H** at every pothole,
+   export, and put the files in `data/tags/`. Then
+   `python scripts/harvest_frames.py --events data/tags/*.csv --out data/label_queue_tags` takes 3 frames
+   before each tag; pre-label them with `--out data/egypt_test/prelabels_tags`, triage them the same way,
+   and run `apply_review.py ... --prelabels data/egypt_test/prelabels_tags --name youtube_batch2`.
 4. **Train on Kaggle.** Upload the exports as the **private** dataset `icvsp-egypt-train`
    (`youtube_*.zip`, `egypt_*.zip`, `background_*.zip`) and run the notebook with `EXPERIMENT = 'v3_egypt_night'`.
    The notebook also adds synthetic night copies of 30 % of the daytime images (`make_night.py`;
