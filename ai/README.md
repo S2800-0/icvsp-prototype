@@ -72,14 +72,16 @@ After each Colab session, unzip `icvsp_results.zip` into `ICVSP/ai/` and run
 **Quick visual check:** notebook step 9 runs the model on uploaded clips and returns the videos with
 boxes drawn on them. This shows what it detects but not what it misses, so it is not the final test.
 
-## Step 3: label the Egyptian test set (AI team)
+## Step 3: pre-label, correct, measure (Colab notebook steps 9–10, no GPU needed)
 
-1. `python scripts/extract_frames.py --fps 2`
-2. Pre-label the frames with the v0 model, then correct them in Roboflow or CVAT. Label **every** pothole
-   and bump in each frame, and keep some frames with no hazard as background.
-3. Export in YOLO format to `data/egypt_test/test/{images,labels}` and add `data/egypt_test/data.yaml`
-   (same `names` as `data/merged/data.yaml`, with `test: test/images`).
-4. Target: about **120 speed bumps** from at least 5 different areas.
+1. **Step 9:** upload the clips. It returns `egypt_clips_check.zip` (videos with the model's boxes, for a first look) and
+   `prelabels.zip` (2 frames per second, already labelled by the model).
+2. **Correct the labels in [CVAT](https://app.cvat.ai)** (private, unlike Roboflow's free plan; the clips show faces and plates):
+   create a task with labels exactly `pothole` and `speed_bump`, upload the images, *Upload annotations → Ultralytics YOLO
+   Detection 1.0* with `prelabels.zip`, then check **every** frame: fix boxes, delete false ones, **add missed ones**.
+   Export as *Ultralytics YOLO Detection 1.0, with images*.
+3. **Step 10:** upload that export. `prepare_egypt_test.py` builds the test set (and warns if it has fewer than
+   about 120 speed bumps or fewer than 5 areas), then `evaluate.py` prints the decision.
 
 ## Step 4: decide
 

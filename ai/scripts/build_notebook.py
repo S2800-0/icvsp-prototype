@@ -13,7 +13,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 EMBED = ['requirements.txt', 'configs/classes.yaml', 'scripts/download_sbp.py', 'scripts/merge_datasets.py',
-         'scripts/train.py', 'scripts/evaluate.py', 'scripts/predict_clips.py', 'scripts/extract_frames.py']
+         'scripts/train.py', 'scripts/evaluate.py', 'scripts/predict_clips.py', 'scripts/extract_frames.py',
+         'scripts/prelabel.py', 'scripts/prepare_egypt_test.py']
 
 CHECK_CLASSES = '''import random, pathlib
 import matplotlib.pyplot as plt, matplotlib.patches as patches
@@ -72,7 +73,7 @@ Run **one experiment per Colab session** (free sessions time out). Each new sess
 | Run | What changes | Time on a T4 | Status |
 |---|---|---|---|
 | v0_public_merge | baseline: 50 epochs, 640 px | ~1 h | ✅ done 29 Sep |
-| v1_e150 | train longer: 150 epochs | ~3 h | |
+| v1_e150 | train longer: 150 epochs | ~3 h | ✅ done 30 Sep on Kaggle (mAP50 0.825) |
 | v2_e150_960 | + bigger images (960 px) for small potholes | ~6 h, may need Colab Pro or 2 sessions | |"""),
     ('md', '### 6a. v0 baseline (done, kept for reference; uncomment only to reproduce)'),
     ('code', '# !python scripts/train.py --data /content/merged/data.yaml --device 0 --batch 32 --epochs 50 --name v0_public_merge\n# !python scripts/evaluate.py --weights runs/v0_public_merge/weights/best.pt --device 0 --public-data /content/merged/data.yaml'),
@@ -87,28 +88,52 @@ Run **one experiment per Colab session** (free sessions time out). Each new sess
     ('code', """!cp /content/merged/merge_report.json runs/ 2>/dev/null; cd /content/ai && zip -qr /content/icvsp_results.zip runs -x 'runs/egypt_clips/*'
 from google.colab import files
 files.download('/content/icvsp_results.zip')"""),
-    ('md', """## 9. Quick check on Egyptian clips
-Shows what the model detects on your own phone clips: boxes drawn on each video, plus `summary.csv` with when it saw a bump.
+    ('md', """## 9. Egyptian clips, part 1: visual check + pre-labels
+**No GPU needed** (Runtime type *CPU* is fine, so it never hits the GPU quota). Run steps 1, 2 and 2b first, then this cell.
 
-⚠️ This is a **visual sanity check, not a measurement**: it shows detections but not what the model missed. The real accuracy numbers come from labelling frames (README, step 3).
-
-This step only needs steps 1–2, not the dataset download. Upload the clips (1080p, short) when asked. It uses the model trained in this session if there is one; otherwise upload a `best.pt` from `ICVSP/ai/runs/<run>/weights/`."""),
-    ('code', """import pathlib, shutil
+Name clips `<area>_<name>_<n>.mov` (e.g. `maadi_malak_1.mov`); the area is used to report results per place.
+The cell downloads the current best model from GitHub, then:
+1. draws the model's boxes on every clip → `egypt_clips_check.zip` (watch these for a first impression),
+2. extracts 2 frames per second and pre-labels them → `prelabels.zip` (import into CVAT and correct, see part 2)."""),
+    ('code', """import pathlib, shutil, urllib.request
 from google.colab import files
-clips = pathlib.Path('/content/ai/data/egypt_test/clips'); clips.mkdir(parents=True, exist_ok=True)
+%cd /content/ai
+clips = pathlib.Path('data/egypt_test/clips'); clips.mkdir(parents=True, exist_ok=True)
 print('Select your clips:')
 for name in files.upload():
     shutil.move(name, clips / name)
-trained = sorted(pathlib.Path('/content/ai/runs').glob('v*/weights/best.pt'))
-if trained:
-    WEIGHTS = str(trained[-1])
-else:
-    print('No model trained in this session. Select a best.pt:')
-    WEIGHTS = '/content/ai/' + next(iter(files.upload()))
-print('Using', WEIGHTS)
-!python scripts/predict_clips.py --weights "$WEIGHTS" --conf 0.25
-!cd /content/ai/runs && zip -qr /content/egypt_clips_check.zip egypt_clips
-files.download('/content/egypt_clips_check.zip')"""),
+WEIGHTS = 'models/v1_e150.pt'
+pathlib.Path('models').mkdir(exist_ok=True)
+urllib.request.urlretrieve('https://github.com/S2800-0/icvsp-prototype/raw/main/ai/models/v1_e150.pt', WEIGHTS)
+!python scripts/predict_clips.py --weights {WEIGHTS} --conf 0.25
+!python scripts/extract_frames.py --fps 2
+!python scripts/prelabel.py --weights {WEIGHTS}
+!cd runs && zip -qr /content/egypt_clips_check.zip egypt_clips
+!cd data/egypt_test && zip -qr /content/prelabels.zip prelabels
+files.download('/content/egypt_clips_check.zip')
+files.download('/content/prelabels.zip')"""),
+    ('md', """## 10. Egyptian clips, part 2: label, then measure
+**Labelling (outside Colab), in [CVAT](https://app.cvat.ai), which keeps the task private** (clips show faces and number plates):
+1. Create a task with labels exactly `pothole` and `speed_bump`, and upload the images from `prelabels.zip` (`images/train/`).
+2. *Actions → Upload annotations → Ultralytics YOLO Detection 1.0* → select `prelabels.zip`.
+3. Go through **every** frame: fix wrong boxes, delete false ones, **add missed bumps and potholes**. Empty frames stay empty.
+4. *Export task dataset → Ultralytics YOLO Detection 1.0, with images* → download the zip.
+
+Then run this cell and select that export zip. It builds the Egyptian test set and prints the decision:
+**ENOUGH / TOP-UP / NOT ENOUGH** (thresholds fixed in advance: speed-bump recall ≥ 0.75 and precision ≥ 0.70)."""),
+    ('code', """import pathlib, urllib.request
+from google.colab import files
+%cd /content/ai
+WEIGHTS = 'models/v1_e150.pt'
+if not pathlib.Path(WEIGHTS).exists():
+    pathlib.Path('models').mkdir(exist_ok=True)
+    urllib.request.urlretrieve('https://github.com/S2800-0/icvsp-prototype/raw/main/ai/models/v1_e150.pt', WEIGHTS)
+print('Select the export zip from CVAT:')
+export = next(iter(files.upload()))
+!python scripts/prepare_egypt_test.py "{export}"
+!python scripts/evaluate.py --weights {WEIGHTS} --egypt-data data/egypt_test/data.yaml
+!cd /content/ai && zip -qr /content/egypt_eval.zip evaluation.json runs/eval_egypt_test_*
+files.download('/content/egypt_eval.zip')"""),
 ]
 
 
@@ -124,7 +149,7 @@ Everything in `/kaggle/working` (the trained model, metrics, plots and `icvsp_re
 - **Accelerator: GPU T4 x2**
 - **Internet: On** (needs a phone-verified Kaggle account; used to install packages and download the public SBP-YOLO dataset)
 
-Limits: about 30 GPU hours per week, 12 hours per run. v1 takes ~3 h, v2 ~6 h.
+Limits: about 30 GPU hours per week, 12 hours per run. **Default run: v2 (960 px), about 6 h**; v1 is already done (mAP50 0.825).
 
 _Generated by `scripts/build_notebook.py`. Edit the files in `ICVSP/ai/` and regenerate; do not edit the embedded copies below._"""),
     ('md', """## Settings: the only cell to edit
@@ -132,7 +157,7 @@ _Generated by `scripts/build_notebook.py`. Edit the files in `ICVSP/ai/` and reg
 - `RESUME_FROM`: leave empty for a fresh run. To continue a run that was cut off, attach the earlier version's output
   (*Add Input → Your Work → this notebook*) and paste the path to its `last.pt`, e.g.
   `/kaggle/input/<notebook-name>/ai/runs/v1_e150/weights/last.pt`."""),
-    ('code', """EXPERIMENT = 'v1_e150'     # 'v1_e150' or 'v2_e150_960'
+    ('code', """EXPERIMENT = 'v2_e150_960' # v1_e150 done 30 Sep (mAP50 0.825); v2 = 960 px for small potholes
 RESUME_FROM = ''           # '' = fresh run, or the path to an interrupted run's last.pt
 
 EXPERIMENTS = {
