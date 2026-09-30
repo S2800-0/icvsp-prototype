@@ -5,8 +5,9 @@ speed bump or pothole. This shows WHAT the model detects, but it is not a measur
 it cannot tell you what the model missed. For recall/precision numbers, label the frames
 and use evaluate.py (README, step 3).
 
-Also writes detections.csv (one row per box: clip, time, class, confidence), which
-event_recall.py matches against the team's list of bumps and potholes.
+Also writes detections.csv (one row per box: clip, time, class, confidence, box corners as
+fractions of the frame), which event_recall.py matches against the team's list of bumps and
+potholes, and tools/review.html draws over the video.
 
 Usage:  python scripts/predict_clips.py --weights models/v1_e150.pt [--conf 0.25] [--stride 2]
 """
@@ -29,6 +30,7 @@ def main():
     ap.add_argument('--conf', type=float, default=0.25)
     ap.add_argument('--imgsz', type=int, default=640)
     ap.add_argument('--stride', type=int, default=1, help='check every n-th frame (2 = half the frames)')
+    ap.add_argument('--no-video', action='store_true', help='skip the annotated video copy (faster; review.html draws the boxes)')
     ap.add_argument('--device', default='0' if torch.cuda.is_available() else
                     'mps' if torch.backends.mps.is_available() else 'cpu')
     a = ap.parse_args()
@@ -40,12 +42,13 @@ def main():
         cap = cv2.VideoCapture(str(clip)); fps = cap.get(cv2.CAP_PROP_FPS) or 30.0; cap.release()
         frames = 0
         for r in model.predict(source=str(clip), conf=a.conf, imgsz=a.imgsz, device=a.device, stream=True,
-                               vid_stride=a.stride, save=True, project=str(a.out), name=clip.stem,
+                               vid_stride=a.stride, save=not a.no_video, project=str(a.out), name=clip.stem,
                                exist_ok=True, verbose=False):
             t = frames * a.stride / fps
-            for c, s in zip(r.boxes.cls.tolist(), r.boxes.conf.tolist()):
+            for c, s, (x1, y1, x2, y2) in zip(r.boxes.cls.tolist(), r.boxes.conf.tolist(), r.boxes.xyxyn.tolist()):
                 hits[model.names[int(c)]].append((t, s))
-                dets.append({'clip': clip.name, 't_s': round(t, 2), 'class': model.names[int(c)], 'conf': round(s, 3)})
+                dets.append({'clip': clip.name, 't_s': round(t, 3), 'class': model.names[int(c)], 'conf': round(s, 3),
+                             'x1': round(x1, 4), 'y1': round(y1, 4), 'x2': round(x2, 4), 'y2': round(y2, 4)})
             frames += 1
         for cls, h in hits.items():
             rows.append({'clip': clip.name, 'class': cls, 'frames_with_detection': len({round(t, 3) for t, _ in h}),
@@ -59,7 +62,7 @@ def main():
         w = csv.DictWriter(f, fieldnames=list(rows[0]) if rows else ['clip'])
         w.writeheader(); w.writerows(rows)
     with open(a.out / 'detections.csv', 'w', newline='') as f:
-        w = csv.DictWriter(f, fieldnames=['clip', 't_s', 'class', 'conf'])
+        w = csv.DictWriter(f, fieldnames=['clip', 't_s', 'class', 'conf', 'x1', 'y1', 'x2', 'y2'])
         w.writeheader(); w.writerows(dets)
     print(f'\nAnnotated videos, summary.csv and detections.csv saved in {a.out}')
 

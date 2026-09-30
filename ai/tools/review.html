@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ICVSP Review</title>
+<!--
+  ICVSP review tool: open this file in Chrome or Safari (double-click). Nothing is uploaded:
+  videos, frames and labels are read by the browser from your disk and stay there.
+
+  Video tab:  a drive + detections.csv (predict_clips.py) + events.csv (optional).
+              Watch the model's boxes on the video, jump between detections, tag hazards with one key,
+              export the tags as an events.csv for event_recall.py.
+  Frames tab: the prelabels folder (prelabel.py). Triage each frame with one key:
+              Y = boxes are right, N = no hazard (the boxes are wrong), E = needs fixing in CVAT.
+              Export review.csv, then run scripts/apply_review.py.
+-->
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --text: #1b1f24; --muted: #5f6b7a; --line: #d9dee5;
+  --accent: #2563eb; --bump: #0ea5e9; --pothole: #f97316; --dip: #a855f7; --ok: #16a34a; --bad: #dc2626; --edit: #ca8a04;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1216; --panel: #171b21; --text: #e6e9ee; --muted: #9aa5b4; --line: #2a313b; --accent: #60a5fa;
+  }
+}
+:root[data-theme="dark"] { --bg: #0f1216; --panel: #171b21; --text: #e6e9ee; --muted: #9aa5b4; --line: #2a313b; --accent: #60a5fa; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+header { display: flex; gap: 8px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--panel); flex-wrap: wrap; }
+header h1 { font-size: 15px; margin: 0 12px 0 0; }
+.tab { border: 1px solid var(--line); background: transparent; color: var(--text); padding: 6px 14px; border-radius: 6px; cursor: pointer; font: inherit; }
+.tab.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+main { padding: 12px 16px; max-width: 1400px; margin: 0 auto; }
+.bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 10px; }
+label.file { border: 1px dashed var(--line); padding: 6px 10px; border-radius: 6px; cursor: pointer; background: var(--panel); }
+label.file input { display: none; }
+button { border: 1px solid var(--line); background: var(--panel); color: var(--text); padding: 6px 10px; border-radius: 6px; cursor: pointer; font: inherit; }
+button:hover { border-color: var(--accent); }
+.muted { color: var(--muted); }
+.stage { position: relative; background: #000; border-radius: 8px; overflow: hidden; }
+.stage video, .stage img { display: block; width: 100%; max-height: 68vh; object-fit: contain; }
+.stage canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
+#timeline { height: 92px; }
+#zoom { height: 70px; }
+#timeline, #zoom { width: 100%; display: block; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; margin-top: 8px; cursor: pointer; }
+.keys { font-size: 12.5px; color: var(--muted); margin-top: 8px; }
+kbd { border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; font: 12px ui-monospace, Menlo, monospace; color: var(--text); background: var(--panel); }
+.tags { margin-top: 10px; max-height: 180px; overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; font: 12.5px ui-monospace, Menlo, monospace; }
+.tags div { cursor: pointer; }
+.tags div:hover { color: var(--accent); }
+.pill { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 12px; color: #fff; }
+.grid { display: grid; grid-template-columns: 1fr 260px; gap: 12px; }
+@media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+.side { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px; font-size: 13px; }
+.side h3 { margin: 4px 0 8px; font-size: 13px; }
+.progress { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; margin: 6px 0 10px; }
+.progress > div { height: 100%; background: var(--accent); width: 0; }
+.big { font-size: 22px; font-weight: 600; }
+.hidden { display: none; }
+input[type=range] { vertical-align: middle; }
+</style>
+</head>
+<body>
+<header>
+  <h1>ICVSP review</h1>
+  <button class="tab on" data-tab="video">Video</button>
+  <button class="tab" data-tab="frames">Frames</button>
+  <span class="muted" style="margin-left:auto">Files stay on this computer; nothing is uploaded.</span>
+</header>
+
+<main>
+<!-- ============================== VIDEO ============================== -->
+<section id="tab-video">
+  <div class="bar">
+    <label class="file">🎬 Video <input type="file" id="vidFile" accept="video/*"></label>
+    <label class="file">📄 detections.csv <input type="file" id="detFile" accept=".csv"></label>
+    <label class="file">📌 events.csv <input type="file" id="evFile" accept=".csv"></label>
+    <span>Min conf <input type="range" id="conf" min="0.2" max="0.9" step="0.05" value="0.4"> <b id="confV">0.40</b></span>
+    <span>Speed <select id="rate"><option>0.5</option><option selected>1</option><option>2</option><option>4</option></select></span>
+    <span class="muted" id="vidInfo"></span>
+  </div>
+  <div class="stage" id="vStage"><video id="vid" controls muted playsinline></video><canvas id="vCan"></canvas></div>
+  <canvas id="timeline"></canvas>
+  <canvas id="zoom"></canvas>
+  <div class="keys">
+    <kbd>Space</kbd> play/pause · <kbd>←</kbd><kbd>→</kbd> 1 s · <kbd>Shift</kbd>+<kbd>←</kbd><kbd>→</kbd> 5 s ·
+    <kbd>.</kbd><kbd>,</kbd> next / previous detection · <kbd>]</kbd><kbd>[</kbd> next / previous team event ·
+    tag here: <kbd>B</kbd> speed bump, <kbd>H</kbd> pothole, <kbd>D</kbd> dip · <kbd>Z</kbd> undo last tag.
+    Top timeline = whole drive, bottom = 60 s around the playhead. Click either to jump.
+  </div>
+  <div class="bar" style="margin-top:10px">
+    <b>Tags</b> <span class="muted" id="tagCount">0</span>
+    <button id="exportEv">⬇ Export events.csv</button>
+    <span class="muted">Tag at the moment the car reaches the hazard (same rule as the timestamps you sent).</span>
+  </div>
+  <div class="tags" id="tagList"><span class="muted">No tags yet.</span></div>
+</section>
+
+<!-- ============================== FRAMES ============================== -->
+<section id="tab-frames" class="hidden">
+  <div class="bar">
+    <label class="file">📁 Prelabels folder <input type="file" id="dirIn" webkitdirectory multiple></label>
+    <span class="muted">Choose the folder made by prelabel.py (it holds images/ and labels/).</span>
+    <label><input type="checkbox" id="onlyTodo"> only unreviewed</label>
+  </div>
+  <div class="grid">
+    <div>
+      <div class="stage"><img id="fImg" alt=""><canvas id="fCan"></canvas></div>
+      <div class="keys">
+        <kbd>Y</kbd> boxes are right (goes straight to training) ·
+        <kbd>N</kbd> no hazard here, boxes are wrong (becomes a "not a bump" example) ·
+        <kbd>E</kbd> needs fixing in CVAT (missed hazard, box in the wrong place) ·
+        <kbd>←</kbd><kbd>→</kbd> previous / next · <kbd>U</kbd> clear decision
+      </div>
+    </div>
+    <div class="side">
+      <div class="big" id="fPos">0 / 0</div>
+      <div class="muted" id="fName"></div>
+      <div class="progress"><div id="fProg"></div></div>
+      <div id="fBoxes" class="muted"></div>
+      <h3>Decision</h3>
+      <div id="fDec" class="big">–</div>
+      <h3>Totals</h3>
+      <div id="fTot"></div>
+      <p><button id="exportRev">⬇ Export review.csv</button></p>
+      <p class="muted">Decisions are remembered in this browser if you close the page. Then:<br>
+      <code>python scripts/apply_review.py review.csv --name youtube_batch1</code></p>
+    </div>
+  </div>
+</section>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const COL = { speed_bump: '--bump', pothole: '--pothole', dip: '--dip' };
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const colour = c => css(COL[c] || '--accent');
+const fmt = t => `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, '0')}`;
+const store = { get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
+                set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
+
+function parseCSV(text) {
+  const rows = [], re = /("([^"]|"")*"|[^,\r\n]*)(,|\r?\n|$)/g;
+  let row = [], m;
+  while ((m = re.exec(text)) && m[0] !== '') {
+    let v = m[1]; if (v.startsWith('"')) v = v.slice(1, -1).replace(/""/g, '"');
+    row.push(v);
+    if (m[3] !== ',') { rows.push(row); row = []; }
+  }
+  const [head, ...body] = rows.filter(r => r.some(x => x !== ''));
+  return body.map(r => Object.fromEntries(head.map((h, i) => [h.trim(), r[i]])));
+}
+function download(name, text) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type: 'text/csv' })); a.download = name; a.click();
+}
+function secs(s) { const [m, x] = s.replace(/\s/g, '').split(':'); return +m * 60 + +x; }
+
+document.querySelectorAll('.tab').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.tab').forEach(x => x.classList.toggle('on', x === b));
+  $('tab-video').classList.toggle('hidden', b.dataset.tab !== 'video');
+  $('tab-frames').classList.toggle('hidden', b.dataset.tab !== 'frames');
+});
+
+// ================================================================ VIDEO
+const vid = $('vid'), vCan = $('vCan'), tl = $('timeline'), zm = $('zoom');
+let clipName = '', dets = [], events = [], tags = [], step = 0.1;
+
+$('vidFile').onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  clipName = f.name; vid.src = URL.createObjectURL(f);
+  tags = store.get('tags:' + clipName, []); renderTags();
+};
+$('detFile').onchange = async e => {
+  const rows = parseCSV(await e.target.files[0].text());
+  dets = rows.map(r => ({ clip: r.clip, t: +r.t_s, cls: r.class, conf: +r.conf,
+                          box: r.x1 !== undefined && r.x1 !== '' ? [+r.x1, +r.y1, +r.x2, +r.y2] : null }))
+             .sort((a, b) => a.t - b.t);
+  const ts = [...new Set(dets.map(d => d.t))];
+  step = ts.length > 1 ? Math.min(...ts.slice(1, 200).map((t, i) => t - ts[i]).filter(x => x > 0)) : 0.1;
+  if (!dets.some(d => d.box)) $('vidInfo').textContent = 'This detections.csv has no box positions; re-run predict_clips.py to see boxes.';
+  draw();
+};
+$('evFile').onchange = async e => {
+  events = parseCSV(await e.target.files[0].text()).map(r => ({ clip: r.clip, t: secs(r.time), type: r.type, note: r.note || '' }));
+  draw();
+};
+$('conf').oninput = () => { $('confV').textContent = (+$('conf').value).toFixed(2); draw(); };
+$('rate').onchange = () => vid.playbackRate = +$('rate').value;
+
+const mine = () => dets.filter(d => (!clipName || !d.clip || d.clip === clipName || sameStem(d.clip, clipName)) && d.conf >= +$('conf').value);
+const myEvents = () => events.filter(e => !clipName || e.clip === clipName || sameStem(e.clip, clipName));
+function sameStem(a, b) { return a.replace(/\.[^.]+$/, '') === b.replace(/\.[^.]+$/, ''); }
+function episodes() {
+  const out = []; let cur = null;
+  for (const d of mine()) {
+    if (cur && d.t - cur.end <= 1.5) cur.end = d.t;
+    else { cur = { start: d.t, end: d.t }; out.push(cur); }
+  }
+  return out;
+}
+
+function sizeCanvas(c) {
+  const r = c.getBoundingClientRect(), dpr = devicePixelRatio || 1;
+  c.width = r.width * dpr; c.height = r.height * dpr;
+  const g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); return [g, r.width, r.height];
+}
+
+function drawBoxes() {
+  const [g, W, H] = sizeCanvas(vCan);
+  g.clearRect(0, 0, W, H);
+  if (!vid.videoWidth) return;
+  const s = Math.min(W / vid.videoWidth, H / vid.videoHeight);
+  const vw = vid.videoWidth * s, vh = vid.videoHeight * s, ox = (W - vw) / 2, oy = (H - vh) / 2;
+  const now = vid.currentTime, near = mine().filter(d => d.box && Math.abs(d.t - now) <= step * 0.75);
+  g.lineWidth = 3; g.font = '600 13px -apple-system, sans-serif';
+  for (const d of near) {
+    const [x1, y1, x2, y2] = d.box, c = colour(d.cls);
+    g.strokeStyle = c; g.strokeRect(ox + x1 * vw, oy + y1 * vh, (x2 - x1) * vw, (y2 - y1) * vh);
+    const label = `${d.cls === 'speed_bump' ? 'bump' : d.cls} ${d.conf.toFixed(2)}`;
+    g.fillStyle = c; g.fillRect(ox + x1 * vw, oy + y1 * vh - 18, g.measureText(label).width + 8, 18);
+    g.fillStyle = '#fff'; g.fillText(label, ox + x1 * vw + 4, oy + y1 * vh - 5);
+  }
+}
+
+function drawStrip(c, t0, t1, withLabels) {
+  const [g, W, H] = sizeCanvas(c);
+  g.clearRect(0, 0, W, H);
+  const x = t => (t - t0) / (t1 - t0) * W, rows = ['speed_bump', 'pothole'], rh = (H - 22) / 2;
+  g.font = '11px -apple-system, sans-serif';
+  rows.forEach((cls, i) => {
+    g.fillStyle = css('--muted'); g.fillText(cls === 'speed_bump' ? 'bump' : 'pothole', 4, 12 + i * rh + rh / 2);
+    g.fillStyle = colour(cls);
+    for (const d of mine()) if (d.cls === cls && d.t >= t0 && d.t <= t1) {
+      g.globalAlpha = 0.25 + 0.75 * Math.min(1, (d.conf - 0.2) / 0.6);
+      g.fillRect(x(d.t), 4 + i * rh, Math.max(1.5, x(d.t + step) - x(d.t)), rh - 4);
+    }
+    g.globalAlpha = 1;
+  });
+  for (const e of myEvents()) if (e.t >= t0 && e.t <= t1) {         // team timestamps: dashed
+    g.strokeStyle = colour(e.type); g.setLineDash([4, 3]); g.lineWidth = 2;
+    g.beginPath(); g.moveTo(x(e.t), 0); g.lineTo(x(e.t), H - 18); g.stroke(); g.setLineDash([]);
+    if (withLabels) { g.fillStyle = colour(e.type); g.fillText(fmt(e.t), x(e.t) + 3, H - 6); }
+  }
+  for (const e of tags) if (e.t >= t0 && e.t <= t1) {               // your new tags: solid triangles
+    g.fillStyle = colour(e.type); g.beginPath();
+    g.moveTo(x(e.t) - 6, H - 2); g.lineTo(x(e.t) + 6, H - 2); g.lineTo(x(e.t), H - 14); g.fill();
+  }
+  g.strokeStyle = css('--text'); g.lineWidth = 2;                    // playhead
+  g.beginPath(); g.moveTo(x(vid.currentTime), 0); g.lineTo(x(vid.currentTime), H); g.stroke();
+  if (!withLabels) { g.fillStyle = css('--muted'); g.fillText(fmt(t0), 4, H - 4); g.fillText(fmt(t1), W - 40, H - 4); }
+}
+
+function draw() {
+  const D = vid.duration || Math.max(1, ...dets.map(d => d.t), ...events.map(e => e.t));
+  drawStrip(tl, 0, D, true);
+  const t = vid.currentTime; drawStrip(zm, Math.max(0, t - 30), Math.max(0, t - 30) + 60, false);
+  drawBoxes();
+  const n = mine().length;
+  if (dets.length) $('vidInfo').textContent = `${n} boxes at conf ≥ ${(+$('conf').value).toFixed(2)} · ${episodes().length} detection episodes · now ${fmt(t)}`;
+}
+function seekFromStrip(c, e, whole) {
+  const r = c.getBoundingClientRect(), f = (e.clientX - r.left) / r.width;
+  const D = vid.duration || 1, t0 = whole ? 0 : Math.max(0, vid.currentTime - 30);
+  vid.currentTime = whole ? f * D : t0 + f * 60;
+}
+tl.onclick = e => seekFromStrip(tl, e, true);
+zm.onclick = e => seekFromStrip(zm, e, false);
+vid.addEventListener('timeupdate', draw);
+vid.addEventListener('seeked', draw);
+vid.addEventListener('loadedmetadata', draw);
+addEventListener('resize', draw);
+(function loop() { if (!vid.paused) drawBoxes(); requestAnimationFrame(loop); })();
+
+function renderTags() {
+  store.set('tags:' + clipName, tags);
+  $('tagCount').textContent = tags.length;
+  $('tagList').innerHTML = tags.length ? '' : '<span class="muted">No tags yet.</span>';
+  [...tags].sort((a, b) => a.t - b.t).forEach(e => {
+    const d = document.createElement('div');
+    d.innerHTML = `${fmt(e.t)}  <span class="pill" style="background:${colour(e.type)}">${e.type}</span>`;
+    d.onclick = () => vid.currentTime = Math.max(0, e.t - 4);
+    $('tagList').appendChild(d);
+  });
+  draw();
+}
+$('exportEv').onclick = () => {
+  const rows = [...tags].sort((a, b) => a.t - b.t)
+    .map(e => `${clipName},${Math.floor(e.t / 60)}:${String(Math.round(e.t % 60)).padStart(2, '0')},${e.type},tagged in review.html`);
+  download(clipName.replace(/\.[^.]+$/, '') + '_events.csv', 'clip,time,type,note\n' + rows.join('\n') + '\n');
+};
+
+// ================================================================ FRAMES
+let frames = [], labels = {}, names = {}, fi = 0, decisions = {};
+const fImg = $('fImg'), fCan = $('fCan');
+
+$('dirIn').onchange = async e => {
+  const files = [...e.target.files];
+  frames = files.filter(f => /\.(jpe?g|png)$/i.test(f.name)).sort((a, b) => a.name.localeCompare(b.name));
+  labels = {}; names = {};
+  for (const f of files) {
+    if (f.name.endsWith('.txt') && !/^(train|val|test|classes)\.txt$/.test(f.name)) labels[f.name.replace(/\.txt$/, '')] = await f.text();
+    if (f.name === 'data.yaml') {
+      const t = await f.text();
+      for (const m of t.matchAll(/^\s+(\d+):\s*(\S+)/gm)) names[m[1]] = m[2];
+    }
+  }
+  if (!Object.keys(names).length) names = { 0: 'pothole', 1: 'speed_bump' };
+  decisions = store.get('decisions', {});
+  fi = 0; showFrame();
+};
+$('onlyTodo').onchange = () => { if ($('onlyTodo').checked) jump(1, true); };
+const stem = f => f.name.replace(/\.[^.]+$/, '');
+
+function showFrame() {
+  if (!frames.length) return;
+  const f = frames[fi];
+  fImg.onload = drawFrameBoxes;
+  if (fImg.dataset.url) URL.revokeObjectURL(fImg.dataset.url);
+  fImg.src = fImg.dataset.url = URL.createObjectURL(f);
+  $('fPos').textContent = `${fi + 1} / ${frames.length}`;
+  $('fName').textContent = f.name;
+  const d = decisions[f.name];
+  $('fDec').innerHTML = d ? `<span class="pill" style="background:${css({ Y: '--ok', N: '--bad', E: '--edit' }[d])}">${
+    { Y: 'Y · correct', N: 'N · no hazard', E: 'E · fix in CVAT' }[d]}</span>` : '–';
+  const done = frames.filter(x => decisions[x.name]).length;
+  $('fProg').style.width = `${100 * done / frames.length}%`;
+  const tot = { Y: 0, N: 0, E: 0 };
+  frames.forEach(x => decisions[x.name] && tot[decisions[x.name]]++);
+  $('fTot').innerHTML = `✅ Y ${tot.Y} · ❌ N ${tot.N} · ✏️ E ${tot.E}<br><span class="muted">${frames.length - done} left</span>`;
+}
+function drawFrameBoxes() {
+  const [g, W, H] = sizeCanvas(fCan);
+  g.clearRect(0, 0, W, H);
+  const s = Math.min(W / fImg.naturalWidth, H / fImg.naturalHeight);
+  const vw = fImg.naturalWidth * s, vh = fImg.naturalHeight * s, ox = (W - vw) / 2, oy = (H - vh) / 2;
+  const lines = (labels[stem(frames[fi])] || '').trim().split('\n').filter(Boolean);
+  g.lineWidth = 3; g.font = '600 13px -apple-system, sans-serif';
+  for (const ln of lines) {
+    const [c, x, y, w, h] = ln.split(/\s+/).map(Number), cls = names[c] || String(c), col = colour(cls);
+    g.strokeStyle = col; g.strokeRect(ox + (x - w / 2) * vw, oy + (y - h / 2) * vh, w * vw, h * vh);
+    g.fillStyle = col; g.fillRect(ox + (x - w / 2) * vw, oy + (y - h / 2) * vh - 18, g.measureText(cls).width + 8, 18);
+    g.fillStyle = '#fff'; g.fillText(cls, ox + (x - w / 2) * vw + 4, oy + (y - h / 2) * vh - 5);
+  }
+  $('fBoxes').textContent = lines.length ? `${lines.length} box${lines.length > 1 ? 'es' : ''} from the model` : 'Model saw nothing here';
+}
+addEventListener('resize', () => frames.length && drawFrameBoxes());
+function jump(dir, todo) {
+  let i = fi;
+  do { i += dir; } while (todo && i >= 0 && i < frames.length && decisions[frames[i].name]);
+  if (i >= 0 && i < frames.length) { fi = i; showFrame(); }
+}
+function decide(k) {
+  if (k) decisions[frames[fi].name] = k; else delete decisions[frames[fi].name];
+  store.set('decisions', decisions);
+  if (k) jump(1, $('onlyTodo').checked); else showFrame();
+}
+$('exportRev').onclick = () => {
+  const rows = frames.filter(f => decisions[f.name]).map(f => `${f.name},${decisions[f.name]}`);
+  download('review.csv', 'frame,decision\n' + rows.join('\n') + '\n');
+};
+
+// ================================================================ KEYS
+addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.metaKey || e.ctrlKey) return;
+  const k = e.key.toLowerCase();
+  if (!$('tab-frames').classList.contains('hidden')) {
+    if (!frames.length) return;
+    if (k === 'y' || k === 'n' || k === 'e') decide(k.toUpperCase());
+    else if (k === 'u') decide(null);
+    else if (k === 'arrowright') jump(1, $('onlyTodo').checked);
+    else if (k === 'arrowleft') jump(-1, false);
+    else return;
+    e.preventDefault(); return;
+  }
+  if (!vid.src) return;
+  const t = vid.currentTime;
+  if (k === ' ') { vid.paused ? vid.play() : vid.pause(); }
+  else if (k === 'arrowright') vid.currentTime = t + (e.shiftKey ? 5 : 1);
+  else if (k === 'arrowleft') vid.currentTime = Math.max(0, t - (e.shiftKey ? 5 : 1));
+  else if (k === '.' || k === ',') {
+    const ep = episodes(), next = k === '.' ? ep.find(x => x.start - 1 > t + 0.2) : [...ep].reverse().find(x => x.start - 1 < t - 0.5);
+    if (next) { vid.pause(); vid.currentTime = Math.max(0, next.start - 1); }
+  }
+  else if (k === ']' || k === '[') {
+    const ev = myEvents().map(x => x.t - 4).sort((a, b) => a - b);
+    const n = k === ']' ? ev.find(x => x > t + 0.2) : [...ev].reverse().find(x => x < t - 0.5);
+    if (n !== undefined) vid.currentTime = Math.max(0, n);
+  }
+  else if (k === 'b' || k === 'h' || k === 'd') { tags.push({ t, type: { b: 'speed_bump', h: 'pothole', d: 'dip' }[k] }); renderTags(); }
+  else if (k === 'z') { tags.pop(); renderTags(); }
+  else return;
+  e.preventDefault();
+});
+</script>
+</body>
+</html>

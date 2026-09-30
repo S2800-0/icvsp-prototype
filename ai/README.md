@@ -21,7 +21,9 @@ ai/
 │   ├── event_recall.py      # scores a clip against a list of bump / pothole timestamps
 │   ├── check_events.py      # contact sheets of the model's boxes just before each event
 │   ├── harvest_frames.py    # picks the frames worth labelling from long drives (train videos only)
-│   └── make_night.py        # synthetic night copies of daytime training images
+│   ├── make_night.py        # synthetic night copies of daytime training images
+│   └── apply_review.py      # Y/N/E decisions from review.html → training zips + a small CVAT batch
+├── tools/review.html        # open in the browser: watch boxes on a video, tag hazards, triage frames
 ├── data/
 │   ├── raw/                 # one sub-folder per source dataset (YOLO format)
 │   ├── merged/              # created by merge_datasets.py
@@ -113,17 +115,21 @@ fine-tunes v2 on Egyptian frames instead of merging more foreign datasets.
    YouTube drives are for private experiments only: never commit or publish their frames.
 2. **Harvest.** `python scripts/harvest_frames.py` keeps the frames where v2 fires plus a random
    sample (about 250 per 10-minute video), then `python scripts/prelabel.py --weights models/v2_e150_960.pt
-   --imgsz 960 --frames data/label_queue` pre-labels them for CVAT.
-3. **Label in CVAT.** Correct every frame. Deleting a wrong box on a reflection turns that frame into a
-   **hard negative**, which is exactly what the model needs. Target: 300–500 frames, about a third at
-   night, plus 100–200 hazard-free night frames as `background_*`.
+   --imgsz 960 --frames data/label_queue` pre-labels them.
+3. **Triage in `tools/review.html`** (double-click it; nothing is uploaded). *Frames* tab → choose
+   `data/egypt_test/prelabels` → one key per frame: **Y** boxes right, **N** no hazard (boxes wrong),
+   **E** needs fixing. Export `review.csv`, then
+   `python scripts/apply_review.py review.csv --name youtube_batch1` writes three zips to `data/reviewed/`.
+   Only the **E** frames go to CVAT. **N** frames become hard negatives ("a reflection is not a bump"),
+   which is exactly what the model needs. Target: 300–500 frames, about a third at night.
 4. **Train on Kaggle.** Upload the exports as the **private** dataset `icvsp-egypt-train`
    (`youtube_*.zip`, `egypt_*.zip`, `background_*.zip`) and run the notebook with `EXPERIMENT = 'v3_egypt_night'`.
    The notebook also adds synthetic night copies of 30 % of the daytime images (`make_night.py`;
    check the look with `python scripts/make_night.py --preview 12`).
-5. **Test** on the held-out videos: `predict_clips.py` + `event_recall.py` against the timestamps, with
-   `check_events.py` to see where the boxes really are, and on the public test set to make sure
-   daytime accuracy did not drop.
+5. **Test** on the held-out videos: `predict_clips.py --no-video` + `event_recall.py` against the
+   timestamps, and on the public test set to make sure daytime accuracy did not drop. Open the video with
+   its `detections.csv` in `tools/review.html` (*Video* tab) to see where the boxes really are; the same
+   page records timestamps (**B** bump, **H** pothole, **D** dip while watching) and exports `events.csv`.
 
 ## Licences
 
