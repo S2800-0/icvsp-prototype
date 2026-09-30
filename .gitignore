@@ -6,7 +6,7 @@ ai/data/egypt_test/frames/
 ai/data/egypt_test/test/
 
 # raw training outputs; curated copies live in ai/results/ and ai/models/
-ai/runs/
+ai/runs*/
 *.zip
 
 __pycache__/
