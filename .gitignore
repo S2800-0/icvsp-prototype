@@ -24,3 +24,4 @@ ai/data/egypt_test/prelabels*/
 ai/data/review.csv
 ai/data/review*.csv
 ai/data/tag_frames_after.txt
+ai/data/batch3_hand_drawn.txt
