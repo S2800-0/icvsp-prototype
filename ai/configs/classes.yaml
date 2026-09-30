@@ -23,3 +23,6 @@ sources:
 # Sources made of video frames are split by video, never by frame (see merge_datasets.py).
 # background_* folders hold hazard-free images (e.g. night reflections) and need no labels.
 video_sources: '^(egypt|youtube|background)'
+# Share of those videos used for validation (chosen by video name). 0 while there are only a few
+# videos, so none of the scarce Egyptian labels is lost; raise to 0.15 with 10+ videos.
+video_val_share: 0

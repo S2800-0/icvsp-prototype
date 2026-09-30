@@ -19,3 +19,5 @@ ai/data/videos/
 ai/data/label_queue/
 ai/data/egypt_test/external/
 ai/data/reviewed/
+ai/data/egypt_test/prelabels/
+ai/data/review.csv

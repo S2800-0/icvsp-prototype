@@ -55,7 +55,7 @@ def main():
         if a.only and v['video_id'] not in a.only:
             continue
         if v['split'].strip().lower() != 'train':
-            print(f"{v['video_id']}: split={v['split']}, skipped (held out for testing)")
+            print(f"{v['video_id']}: split={v['split']}, not harvested")
             continue
         path = a.manifest.parent / v['file']
         cap = cv2.VideoCapture(str(path)); fps = cap.get(cv2.CAP_PROP_FPS) or 30.0

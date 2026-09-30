@@ -13,6 +13,8 @@ source paper; everything else is re-split train/val 85/15 per source.
 Video-derived sources (folder name matching `video_sources` in classes.yaml, e.g. egypt_*,
 youtube_*, background_*) are split by VIDEO, not by frame: neighbouring frames of one drive are
 near-copies, so splitting them by frame would leak the validation set into training.
+With few videos, `video_val_share: 0` keeps every video in train: the public val set drives early
+stopping, and the held-out test videos in data/videos/videos.csv measure the Egyptian result.
 A frame's video is its file name without the trailing frame number (<video>_0042.jpg).
 
 Background sources (folder name starting with background_) hold images with no hazards,
@@ -113,7 +115,9 @@ def main():
     args = ap.parse_args()
     random.seed(args.seed)
     names, rules, exclude = load_scheme()
-    video_rx = re.compile(yaml.safe_load((ROOT / 'configs/classes.yaml').read_text()).get('video_sources', '$^'), re.I)
+    cfg = yaml.safe_load((ROOT / 'configs/classes.yaml').read_text())
+    video_rx = re.compile(cfg.get('video_sources', '$^'), re.I)
+    video_val_share = float(cfg.get('video_val_share', 0))
 
     if args.out.exists():
         shutil.rmtree(args.out)
@@ -159,18 +163,13 @@ def main():
         # re-split non-test images 85/15 per source (per video for video-derived sources)
         rest = [x for x in pending if x[2] != 'test']
         if video_rx.search(src.name):
-            groups = defaultdict(list)
-            for x in rest:
-                groups[video_of(x[0])].append(x)
-            keys = sorted(groups)
-            random.shuffle(keys)
-            val_keys, n = set(), 0
-            for k in keys:                      # fill val with whole videos up to ~15 %
-                if n >= 0.15 * len(rest) or len(val_keys) == len(keys) - 1:
-                    break
-                val_keys.add(k); n += len(groups[k])
-            final = [(i, l, 'val' if video_of(i) in val_keys else 'train') for i, l, _ in rest]
-            rep['videos'] = {'train': len(keys) - len(val_keys), 'val': len(val_keys)}
+            # choose val videos by a hash of the video name, so one video lands on the same side in
+            # every zip it appears in (Y frames, backgrounds, CVAT fixes)
+            val = lambda i: int(hashlib.md5(video_of(i).encode()).hexdigest(), 16) % 1000 < 1000 * video_val_share
+            final = [(i, l, 'val' if val(i) else 'train') for i, l, _ in rest]
+            vids = {video_of(i) for i, _, _ in rest}
+            rep['videos'] = {'train': sorted(v for v in vids if not val(Path(v + '_0'))),
+                             'val': sorted(v for v in vids if val(Path(v + '_0')))}
         else:
             random.shuffle(rest)
             n_val = round(0.15 * len(rest))
