@@ -103,6 +103,24 @@ boxes drawn on them. This shows what it detects but not what it misses, so it is
 
 The thresholds are fixed in `scripts/evaluate.py` before testing, so the decision stays honest.
 
+## Labelling rules (everyone uses the same ones)
+
+The test is the same for both classes: **would a careful driver slow down or steer around it?**
+If not, it is not labelled. The camera only decides *whether* there is a hazard; how bad it is comes
+from the IMU when the car drives over it.
+
+| Class | Label it | Do not label it |
+|---|---|---|
+| `speed_bump` (مطب) | a raised strip across the lane built to slow traffic, painted or not | rumble strips, road seams, expansion joints, small ridges you cross at normal speed |
+| `pothole` (حفرة) | a hole where the asphalt is broken or missing and has depth, about a palm or larger; water-filled holes; broken edges of the road | cracks, flat repairs and patches, stains, shadows, wet patches, unpaved roads (the whole road is rough) |
+| neither (for now) | manhole and drain covers (بلاعة), even slightly sunken ones | |
+
+If a manhole is **sunken, open or has broken asphalt around it**, label only the broken hole as
+`pothole`, not the cover. Sunken manholes are a common Egyptian hazard and may become a third class
+later (public manhole data exists), but only once there are enough examples.
+
+Draw the box tightly around the hazard itself, and label every one in the frame, including far ones.
+
 ## Step 5: Egyptian + night fine-tune (v3)
 
 The first Egyptian tests showed two gaps: **night** (streetlight reflections on wet roads are taken
