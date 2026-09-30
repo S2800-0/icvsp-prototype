@@ -22,3 +22,5 @@ ai/data/egypt_test/external/
 ai/data/reviewed/
 ai/data/egypt_test/prelabels*/
 ai/data/review.csv
+ai/data/review*.csv
+ai/data/tag_frames_after.txt

@@ -197,17 +197,23 @@ for attempt in range(3):
     if not __import__('pathlib').Path('/tmp/raw/sbp_yolo/failed.txt').exists():
         break
     __import__('os').remove('/tmp/raw/sbp_yolo/failed.txt')
-import glob, os, pathlib, urllib.request, zipfile
-zips = sorted(glob.glob('/kaggle/input/icvsp-egypt-train/**/*.zip', recursive=True))
+import glob, pathlib, shutil, urllib.request, zipfile
+# Kaggle unzips uploaded zips into folders, so accept both zips and folders, wherever the dataset is mounted
+roots = [pathlib.Path(p) for p in glob.glob('/kaggle/input/**/icvsp-egypt-train', recursive=True)]
+items = sorted(x for r in roots for x in r.iterdir()) if roots else []
 if EXPERIMENT.startswith('v3'):
-    assert zips, 'v3 needs the private icvsp-egypt-train dataset attached (see the top of the notebook).'
+    assert items, 'v3 needs the private icvsp-egypt-train dataset attached (see the top of the notebook).'
     pathlib.Path('models').mkdir(exist_ok=True)
     urllib.request.urlretrieve('https://github.com/S2800-0/icvsp-prototype/raw/main/ai/models/v2_e150_960.pt',
                                'models/v2_e150_960.pt')
-for z in zips:
-    name = pathlib.Path(z).stem.lower()
-    assert name.startswith(('egypt', 'youtube', 'background')), f'{z}: name it egypt_*, youtube_* or background_*'
-    zipfile.ZipFile(z).extractall(f'/tmp/raw/{name}')
+for x in items:
+    name = x.name.lower().removesuffix('.zip')
+    if not name.startswith(('egypt', 'youtube', 'background')):
+        print('skipped', x.name, '(name it egypt_*, youtube_* or background_*)'); continue
+    if x.suffix.lower() == '.zip':
+        zipfile.ZipFile(x).extractall(f'/tmp/raw/{name}')
+    elif x.is_dir():
+        shutil.copytree(x, f'/tmp/raw/{name}', dirs_exist_ok=True)
     print(name, sum(1 for _ in pathlib.Path(f'/tmp/raw/{name}').rglob('*.jpg')), 'images')
 !python scripts/merge_datasets.py --raw /tmp/raw --out /tmp/merged
 if EXPERIMENT.startswith('v3') and NIGHT_SHARE > 0:
