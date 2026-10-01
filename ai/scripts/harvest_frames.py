@@ -22,6 +22,10 @@ while watching the video in tools/review.html (B = bump, H = pothole; "Export ev
 That is where the bump is in view, so this is the fastest way to collect real bumps, including the
 ones the model misses today. Default: 3 frames per tag, 2.5, 1.5 and 0.5 s before it.
 
+Hard-negative mode: --classes speed_bump --avoid-events data/tags/*.csv --random-per-min 0 keeps only
+frames where the model draws a speed-bump box, away from every hazard the team tagged. Most of these
+are kerbs, buses or cars taken for bumps; sorted N in tools/review.html they become "not a bump".
+
 Frames are saved as data/label_queue/<video_id>/<video_id>_<frame>.jpg; the name before the last
 underscore is what merge_datasets.py uses to keep each video in a single split.
 Then:  python scripts/prelabel.py --weights models/v2_e150_960.pt --imgsz 960 --frames data/label_queue
@@ -94,6 +98,9 @@ def main():
     ap.add_argument('--only', nargs='*', help='harvest only these video_ids')
     ap.add_argument('--out', default=ROOT / 'data/label_queue', type=Path)
     ap.add_argument('--events', nargs='*', type=Path, help='tag mode: events CSVs exported from tools/review.html')
+    ap.add_argument('--classes', nargs='*', help='count a frame as "fired" only for these classes (default: all)')
+    ap.add_argument('--avoid-events', nargs='*', type=Path, default=[],
+                    help='skip frames from 4 s before to 3 s after any event in these CSVs (real hazards)')
     ap.add_argument('--offsets', default='-2.5,-1.5,-0.5', help='tag mode: seconds around each tag')
     ap.add_argument('--device', default='0' if torch.cuda.is_available() else
                     'mps' if torch.backends.mps.is_available() else 'cpu')
@@ -104,6 +111,11 @@ def main():
     if a.events:
         return from_tags(a, videos)
     model = YOLO(str(a.weights))
+    avoid = {}
+    for f in a.avoid_events:
+        for r in csv.DictReader(open(f)):
+            t = secs(r['time'])
+            avoid.setdefault(Path(r['clip']).stem, []).append((t - 4, t + 3))
     for v in videos:
         if a.only and v['video_id'] not in a.only:
             continue
@@ -117,7 +129,13 @@ def main():
         fired, quiet = [], []
         for k, r in enumerate(model.predict(source=str(path), imgsz=a.imgsz, conf=a.conf, device=a.device,
                                             stream=True, vid_stride=stride, verbose=False)):
-            (fired if len(r.boxes) else quiet).append(k * stride)   # frame numbers only, to save memory
+            idx = k * stride
+            if any(lo <= idx / fps <= hi for lo, hi in avoid.get(Path(v['file']).stem, [])):
+                continue
+            hit = [model.names[int(c)] for c in r.boxes.cls.tolist()]
+            if a.classes:
+                hit = [h for h in hit if h in a.classes]
+            (fired if hit else quiet).append(idx)   # frame numbers only, to save memory
         minutes = n_frames / fps / 60
         n_rand = min(len(quiet), round(a.random_per_min * minutes))
         if len(fired) > a.max - n_rand:      # too many: keep an even spread over the video
