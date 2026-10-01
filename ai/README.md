@@ -119,7 +119,12 @@ If a manhole is **sunken, open or has broken asphalt around it**, label only the
 `pothole`, not the cover. Sunken manholes are a common Egyptian hazard and may become a third class
 later (public manhole data exists), but only once there are enough examples.
 
-Draw the box tightly around the hazard itself, and label every one in the frame, including far ones.
+Draw the box tightly around the hazard itself, and label every one in the frame, including far ones
+and ones at the side of the road. The camera decides **whether** something is a hazard, never whether it
+is in the car's path: that is decided afterwards from the box position, the lane and the GPS track, and a
+pothole at the road edge is exactly what the next car in that lane needs to know about. Small or shallow
+holes are excluded by the size rule, not by their position. Where the whole street surface is broken,
+box only the distinct holes, not the entire road.
 
 ## Step 5: Egyptian + night fine-tune (v3)
 
