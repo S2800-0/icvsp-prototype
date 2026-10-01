@@ -26,3 +26,18 @@ Test videos: the two held-out Cairo videos (night 10 min, day 18 min). Scoring a
 **Conclusion:** use the road filter for speed bumps (lenient rule, which is safer at night). On the unit
 it only needs to run on frames where a bump was detected. Limits: Cityscapes is daytime European
 roads, so the mask is patchy at night; 8 bumps and 8 potholes in the test videos are too few to prove it.
+
+## Update: v3c (kerb and shadow hard negatives), road filter applied
+
+| Confidence ≥ 0.4, lenient road filter | v3b | v3c |
+|---|---|---|
+| Day: false pothole flags / min | 1.00 | 0.72 |
+| Day: false bump flags / min | 0.11 | 0.06 |
+| Night: false bump flags / min | 0.50 | 0.80 |
+| Night: potholes found (conf ≥ 0.25) | 3 / 6 | 4 / 6 |
+| Both videos: all false flags / min (conf ≥ 0.25) | 1.89 | 1.85 |
+
+v3c is best on the public test (mAP50 0.846) and by day; at night it draws more bump boxes, but
+mostly off the road (mean road share around them 0.29 vs 0.48), so the filter halves them. The
+confirmed potholes at 4:03 and 7:47 are still detected. With 8 potholes and 8 bumps in the test
+videos the two models are within noise; a larger labelled test set is now the limiting factor.
