@@ -27,3 +27,4 @@ ai/data/tag_frames_after.txt
 ai/data/batch3_hand_drawn.txt
 # trained partly on private YouTube frames: kept local, not redistributed
 ai/models/v3_egypt_night.pt
+ai/models/v3b_egypt_night.pt
