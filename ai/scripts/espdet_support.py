@@ -15,7 +15,8 @@ ROOT = Path(__file__).resolve().parents[1]
 DEST = ROOT / 'third_party/esp-detection'
 COMMIT = '28de5902a357d99dd9a5db0f52905255641c5a78'
 FILES = ['LICENSE', 'cfg/models/espdet_pico.yaml', 'nn/esp_tasks.py', 'nn/modules/__init__.py',
-         'nn/modules/esp_block.py', 'nn/modules/esp_conv.py', 'nn/modules/esp_head.py']
+         'nn/modules/esp_block.py', 'nn/modules/esp_conv.py', 'nn/modules/esp_head.py',
+         'deploy/__init__.py', 'deploy/export.py', 'deploy/quantize.py', 'deploy/eval_quantized_model.py']
 MODEL_YAML = DEST / 'cfg/models/espdet_pico.yaml'
 
 
@@ -24,6 +25,9 @@ def fetch():
         out = DEST / f
         if not out.exists():
             out.parent.mkdir(parents=True, exist_ok=True)
+            if f.endswith('__init__.py') and f.startswith('deploy/'):
+                out.write_text('')                      # not in the repo; makes deploy importable
+                continue
             urllib.request.urlretrieve(f'https://raw.githubusercontent.com/espressif/esp-detection/{COMMIT}/{f}', out)
     print(f'ESPDet files ready in {DEST} (commit {COMMIT[:7]})')
 
