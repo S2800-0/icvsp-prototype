@@ -27,3 +27,20 @@ Held-out Egyptian video, confidence ≥ 0.25, road and motion checks on speed bu
 
 **Conclusion:** at 224 px ESPDet-Pico is not usable for potholes, but it is a credible speed-bump camera
 for a low-cost Lite tier, alongside the IMU. Next: the 320 px run, longer training, and an on-chip test.
+
+## 8-bit quantisation (ESP-PPQ, simulated)
+
+`scripts/espdet_quantize.py`: Espressif's pipeline (ONNX export, ESP-PPQ 8-bit quantisation for the ESP32-S3
+with 256 calibration images, 3/4 public training images and 1/4 Egyptian frames), then the quantised graph
+scored in ESP-PPQ's simulator on the public test split (1,104 images), square 224 input for both.
+
+| | mAP50 | speed bump | pothole |
+|---|---|---|---|
+| float32 | 0.527 | 0.781 | 0.274 |
+| int8 (simulated) | 0.479 | 0.724 | 0.235 |
+| change | -0.048 | -0.057 | -0.039 |
+
+The .espdl file for the chip is 486 KB, small enough for the ESP32-S3's flash. Accuracy drops by about 5 mAP50
+points, a typical cost of plain post-training quantisation. Quantisation-aware training or
+mixed precision (some layers in 16 bits) could win some of it back. This is a simulation: speed and the
+on-chip result still need a real board.

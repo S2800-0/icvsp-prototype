@@ -52,13 +52,14 @@ def main():
     ap.add_argument('--split', default='test')
     ap.add_argument('--target', default='esp32s3', choices=['esp32s3', 'esp32p4'])
     ap.add_argument('--calib', type=int, default=256, help='number of calibration images')
+    ap.add_argument('--error-report', action='store_true',
+                    help="ESP-PPQ's per-layer error report (slow: about 10 minutes on a laptop CPU)")
     a = ap.parse_args()
 
     assert espdet_support.enable(), 'run: python scripts/espdet_support.py'
     sys.path.insert(0, str(espdet_support.DEST))
     from deploy.export import Export
-    from deploy.quantize import quant_espdet
-    import deploy.eval_quantized_model as eqm
+    import deploy.quantize as dq
     from esp_ppq.executor import TorchExecutor
     from ultralytics import YOLO
     from ultralytics.nn.modules.head import Detect
@@ -85,25 +86,33 @@ def main():
     calib = work / 'calib'
     n_cal = calibration_images(a.data, calib, a.calib)
     espdl = ROOT / 'models' / f'{a.weights.stem}_{a.target}.espdl'
-    graph = quant_espdet(onnx_path=str(onnx_path), target=a.target, num_of_bits=8, device='cpu',
+    if not a.error_report:
+        orig = dq.espdl_quantize_onnx
+        dq.espdl_quantize_onnx = lambda *args, **kw: orig(*args, **{**kw, 'error_report': False})
+    graph = dq.quant_espdet(onnx_path=str(onnx_path), target=a.target, num_of_bits=8, device='cpu',
                          batchsz=32, imgsz=a.imgsz, calib_dir=str(calib), espdl_model_path=str(espdl))
     executor = TorchExecutor(graph=graph, device='cpu')
 
-    # 3. Score the simulated 8-bit graph; Espressif's helper assumes one class, so decode with ours
-    def ppq_graph_inference(executor, task, inputs, device):
-        out = executor(inputs)
-        bs = inputs.shape[0]
+    # 3. Score the simulated 8-bit graph with the standard validator: the model's forward pass is replaced
+    # by the quantised graph (Espressif's own validator targets an older Ultralytics). Square inputs for both,
+    # because the graph was exported at a fixed size.
+    head = Detect(nc=nc, reg_max=1, end2end=False, ch=[32, 64, 128])
+    head.stride = torch.tensor([8.0, 16.0, 32.0])
+
+    def int8_forward(x, *args, **kwargs):
+        out = executor(x.float())
+        bs = x.shape[0]
         boxes = torch.cat([out[2 * i].view(bs, 4, -1) for i in range(3)], dim=-1)
         scores = torch.cat([out[2 * i + 1].view(bs, nc, -1) for i in range(3)], dim=-1)
-        head = Detect(nc=nc, reg_max=1, end2end=False, ch=[32, 64, 128])
-        head.stride = torch.tensor([8.0, 16.0, 32.0])
         return head._inference(dict(boxes=boxes, scores=scores, feats=[out[i] for i in range(0, 6, 2)]))
-    eqm.ppq_graph_inference = ppq_graph_inference
 
-    common = dict(data=str(a.data), split=a.split, imgsz=a.imgsz, device='cpu', plots=False, verbose=False)
+    common = dict(data=str(a.data), split=a.split, imgsz=a.imgsz, device='cpu', batch=1, rect=False,
+                  plots=False, verbose=False)
     fp = YOLO(str(pt)).val(project=str(work), name='val_float', exist_ok=True, **common)
-    q8 = YOLO(str(pt)).val(validator=eqm.make_quant_validator_class(executor),
-                           project=str(work), name='val_int8', exist_ok=True, batch=1, **common)
+    qm = YOLO(str(pt))
+    qm.model.fuse = lambda *a, **k: qm.model  # keep the module as is; only forward() matters
+    qm.model.forward = int8_forward
+    q8 = qm.val(project=str(work), name='val_int8', exist_ok=True, **common)
 
     def summary(r):
         return {'mAP50': round(float(r.box.map50), 3),
