@@ -32,3 +32,4 @@ ai/models/v3c_kerbs.pt
 
 # third-party model code fetched by scripts/espdet_support.py (AGPL-3.0, Espressif)
 ai/third_party/
+ai/models/espdet_pico_224.pt
