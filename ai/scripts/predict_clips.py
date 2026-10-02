@@ -18,6 +18,10 @@ import cv2
 import torch
 from ultralytics import YOLO
 
+import espdet_support
+
+espdet_support.enable()   # lets ESPDet-Pico weights load; no effect otherwise
+
 ROOT = Path(__file__).resolve().parents[1]
 VIDEO = {'.mov', '.mp4', '.m4v', '.avi'}
 

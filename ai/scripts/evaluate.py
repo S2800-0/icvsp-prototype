@@ -17,6 +17,10 @@ from pathlib import Path
 import torch
 from ultralytics import YOLO
 
+import espdet_support
+
+espdet_support.enable()   # lets ESPDet-Pico weights load; no effect otherwise
+
 ROOT = Path(__file__).resolve().parents[1]
 ENOUGH_RECALL, ENOUGH_PRECISION, TOPUP_RECALL = 0.75, 0.70, 0.50
 

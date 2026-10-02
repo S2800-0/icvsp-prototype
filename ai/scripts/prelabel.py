@@ -17,6 +17,10 @@ import torch
 import yaml
 from ultralytics import YOLO
 
+import espdet_support
+
+espdet_support.enable()   # lets ESPDet-Pico weights load; no effect otherwise
+
 ROOT = Path(__file__).resolve().parents[1]
 
 

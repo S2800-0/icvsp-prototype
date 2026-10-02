@@ -6,12 +6,16 @@ Usage:  python scripts/train.py [--model yolo11n.pt] [--epochs 50] [--fraction 1
         --fraction < 1.0 trains on a random subset (used for the learning curve).
         --resume runs/<name>/weights/last.pt continues an interrupted run where it stopped
         (same dataset path and runs folder as the original run, e.g. a later Kaggle session).
+        --model espdet_pico trains Espressif's ESPDet-Pico from scratch (run scripts/espdet_support.py once
+        first), with Espressif's augmentation settings.
 """
 import argparse
 from pathlib import Path
 
 import torch
 from ultralytics import YOLO
+
+import espdet_support
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -31,14 +35,20 @@ def main():
     a = ap.parse_args()
 
     if a.resume:
+        espdet_support.enable()
         YOLO(a.resume).train(resume=True)
         return
 
     name = a.name or f'{Path(a.model).stem}_e{a.epochs}_f{int(a.fraction * 100)}'
+    extra = {}
+    if a.model == 'espdet_pico':
+        assert espdet_support.enable(), 'run: python scripts/espdet_support.py'
+        a.model = str(espdet_support.MODEL_YAML)
+        extra = dict(close_mosaic=30, mosaic=1.0, mixup=0.0, copy_paste=0.1)   # esp-detection's train.py
     YOLO(a.model).train(
         data=str(a.data), epochs=a.epochs, imgsz=a.imgsz, batch=a.batch, device=a.device,
         fraction=a.fraction, project=str(ROOT / 'runs'), name=name, exist_ok=True,
-        patience=a.patience, workers=4, seed=0, plots=True,
+        patience=a.patience, workers=4, seed=0, plots=True, **extra,
     )
 
 
