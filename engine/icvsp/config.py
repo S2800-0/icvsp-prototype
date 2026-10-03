@@ -12,7 +12,8 @@ from dataclasses import dataclass, field
 class Config:
     # --- plausibility (data-centric checks on each Safety Event) ---
     max_future_s: float = 2.0            # reject events stamped this far in the future
-    max_age_s: dict = field(default_factory=lambda: {"pothole": 48 * 3600})  # older = stale / possible replay
+    # older = stale / possible replay. Speed bumps are built and rarely removed, so reports stay valid longer.
+    max_age_s: dict = field(default_factory=lambda: {"pothole": 48 * 3600, "speed_bump": 14 * 24 * 3600})
     max_acc_m: float = 30.0              # GPS accuracy worse than this can't be placed on a segment
     good_acc_m: float = 5.0              # accuracy at or better than this gets full consistency
     max_speed_kmh: float = 250.0
@@ -21,7 +22,7 @@ class Config:
     sender_max_offset_m: float = 40.0    # event location vs sender's own position at that time
 
     # --- trust ---
-    freshness_tau_s: dict = field(default_factory=lambda: {"pothole": 6 * 3600})
+    freshness_tau_s: dict = field(default_factory=lambda: {"pothole": 6 * 3600, "speed_bump": 7 * 24 * 3600})
     prior_good: float = 1.0              # Beta reputation prior: new identities start at
     prior_bad: float = 3.0               # 1 / (1 + 3) = 0.25, i.e. sceptical
 

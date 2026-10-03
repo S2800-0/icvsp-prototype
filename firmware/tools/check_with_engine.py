@@ -53,7 +53,7 @@ def main():
         print(f"{ev['event_id']:16} {ev['type']:10} {ev['severity']:6} conf {ev['confidence']:.2f}  "
               f"engine: {'valid' if not errs else '; '.join(errs)}  signature: {'ok' if good else 'BAD'}  "
               f"tampered/retimed rejected: {not tampered and not retimed}")
-        ok &= good and not tampered and not retimed and (not errs or ev['type'] == 'speed_bump')
+        ok &= good and not tampered and not retimed and not errs
     sys.exit(0 if ok else 1)
 
 

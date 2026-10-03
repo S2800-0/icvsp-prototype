@@ -39,6 +39,10 @@ class Schema(unittest.TestCase):
     def test_valid_event_has_no_errors(self):
         self.assertEqual(schema_errors(event().to_dict()), [])
 
+    def test_speed_bump_is_a_valid_type(self):
+        self.assertEqual(schema_errors(event(type="speed_bump").to_dict()), [])
+        self.assertTrue(schema_errors(event(type="kerb").to_dict()))
+
     def test_missing_and_bad_fields_are_reported(self):
         d = event().to_dict()
         del d["source"]
@@ -106,6 +110,15 @@ class TrustMath(unittest.TestCase):
         tau = CFG.freshness_tau_s["pothole"]
         self.assertAlmostEqual(freshness(0, "pothole", CFG), 1.0)
         self.assertAlmostEqual(freshness(tau, "pothole", CFG), math.exp(-1))
+        # a day-old speed-bump report is still worth much more than a day-old pothole report
+        self.assertGreater(freshness(86400, "speed_bump", CFG), 0.8)
+        self.assertLess(freshness(86400, "pothole", CFG), 0.05)
+
+    def test_bump_and_pothole_reports_at_one_spot_stay_separate(self):
+        eng = Engine(CFG)
+        eng.ingest_event(event(event_id="p", source="A"))
+        eng.ingest_event(event(event_id="b", source="B", type="speed_bump"))
+        self.assertEqual(sorted(d.type for d in eng.decide(BASE_T + 1).decisions), ["pothole", "speed_bump"])
 
 
 class TraceFormat(unittest.TestCase):

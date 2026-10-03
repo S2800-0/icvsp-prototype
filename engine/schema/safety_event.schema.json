@@ -8,7 +8,7 @@
   "additionalProperties": false,
   "properties": {
     "event_id": { "type": "string", "minLength": 1 },
-    "type": { "type": "string", "enum": ["pothole"] },
+    "type": { "type": "string", "enum": ["pothole", "speed_bump"] },
     "timestamp": { "type": "string", "format": "date-time" },
     "location": {
       "type": "object",

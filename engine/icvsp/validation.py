@@ -13,7 +13,7 @@ from .config import Config
 from .geo import distance_m
 from .model import Beacon, SafetyEvent, from_iso
 
-HAZARD_TYPES = ("pothole",)
+HAZARD_TYPES = ("pothole", "speed_bump")
 SEVERITIES = ("low", "medium", "high")
 
 

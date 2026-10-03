@@ -55,7 +55,6 @@ secure boot, and key provisioning and registration are part of the cybersecurity
 
 ## Known gaps
 
-- The engine only accepts the type `pothole`; speed-bump reports are rejected until it is extended.
 - No board environment yet: uncomment `[env:xiao_esp32s3]` in `platformio.ini` once we have a board (the
   first build downloads the ESP32 toolchain, several hundred MB).
 - `road_segment` is a coarse grid cell (about 200 m) until the backend maps reports to real roads.
