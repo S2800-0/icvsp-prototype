@@ -33,3 +33,9 @@ ai/models/v3c_kerbs.pt
 # third-party model code fetched by scripts/espdet_support.py (AGPL-3.0, Espressif)
 ai/third_party/
 ai/models/espdet_pico_224.pt
+
+# PlatformIO build output
+firmware/.pio/
+ai/models/*.espdl
+ai/models/*_esp32s3.info
+ai/models/*_esp32s3.json

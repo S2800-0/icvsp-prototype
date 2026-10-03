@@ -1,0 +1,19 @@
+{
+  "weights": "espdet_pico_224.pt",
+  "imgsz": 224,
+  "target": "esp32s3",
+  "split": "test",
+  "calibration_images": 256,
+  "float32": {
+    "mAP50": 0.527,
+    "pothole": 0.274,
+    "speed_bump": 0.781
+  },
+  "int8_simulated": {
+    "mAP50": 0.479,
+    "pothole": 0.235,
+    "speed_bump": 0.724
+  },
+  "espdl_file": "espdet_pico_224_esp32s3.espdl",
+  "espdl_kb": 486.2
+}
