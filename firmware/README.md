@@ -21,7 +21,7 @@ pip install platformio cryptography
 cd firmware
 pio test -e native                         # unit tests (30)
 pio run -e native && .pio/build/native/program   # demo drive: prints signed reports as JSON
-python tools/check_with_engine.py          # backend-side check of the demo's reports
+python tools/check_with_engine.py          # builds the demo, then checks its reports from the backend side
 ```
 
 The first run downloads about 10 MB (PlatformIO's native platform, build tool and the Unity test framework).

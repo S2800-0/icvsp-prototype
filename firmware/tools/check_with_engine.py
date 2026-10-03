@@ -5,9 +5,9 @@ Runs the native demo (a simulated drive), then for every report it prints:
   2. the Ed25519 signature verifies with an independent library (Python `cryptography`),
   3. a tampered copy and a copy with a changed time do not verify.
 
-    cd firmware && pio run -e native && python tools/check_with_engine.py
+    cd firmware && python tools/check_with_engine.py
 
-Needs `pip install cryptography`.
+Needs `pip install platformio cryptography`; it builds the demo itself.
 """
 import json, struct, subprocess, sys
 from pathlib import Path
@@ -34,6 +34,8 @@ def verifies(key, sig, *args) -> bool:
 
 
 def main():
+    # build the demo first: `pio test` leaves a test binary at the same path
+    subprocess.run([sys.executable, '-m', 'platformio', 'run', '-e', 'native', '-s'], cwd=FW, check=True)
     program = FW / '.pio/build/native/program'
     lines = subprocess.run([str(program)], capture_output=True, text=True, check=True).stdout.splitlines()
     assert lines, 'the demo printed no reports'
