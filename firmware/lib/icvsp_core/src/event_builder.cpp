@@ -31,7 +31,7 @@ void grid_cell(double lat, double lon, char* out, size_t cap) {
 }
 
 size_t EventBuilder::build(const Detection& d, const GnssFix& fix, char* buf, size_t cap,
-                           char* msg_id_out, size_t msg_id_cap) {
+                           char* msg_id_out, size_t msg_id_cap, const char* model) {
     if (!fix.valid || fix.acc_m <= 0) return 0;
     char id[48], ts[25], cell[40];
     std::snprintf(id, sizeof id, "%s-%lu", device_id_, static_cast<unsigned long>(seq_));
@@ -49,7 +49,7 @@ size_t EventBuilder::build(const Detection& d, const GnssFix& fix, char* buf, si
         "\"speed_kmh\":%.1f,\"heading\":%.1f,\"severity\":\"%s\",\"confidence\":%.2f,"
         "\"source\":\"%s\",\"model\":\"%s\"}",
         id, to_string(d.type), ts, fix.lat, fix.lon, fix.acc_m, cell, speed, heading,
-        to_string(d.severity), d.confidence, device_id_, model_);
+        to_string(d.severity), d.confidence, device_id_, model ? model : model_);
     if (n < 0 || static_cast<size_t>(n) >= cap) return 0;
     if (msg_id_out && msg_id_cap) std::snprintf(msg_id_out, msg_id_cap, "%s", id);
     ++seq_;

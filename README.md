@@ -20,7 +20,7 @@ This repository holds the working prototypes:
 | Camera detector, Pro unit (YOLO11n) | ✅ v3c, fine-tuned on Egyptian day and night footage: public test mAP50 0.846 |
 | False-alarm filters for speed bumps (road-surface check, motion check) | ✅ Cut false bump flags by over 95 % on held-out Egyptian video |
 | Egyptian road tests | 🟡 Potholes detected above chance by day and night; many unpainted bumps are barely visible on camera, so the IMU becomes the main bump sensor. Own recordings needed for a larger test set |
-| Device firmware (IMU detector, signed reports, replay window) | ✅ 30 unit tests on a laptop (PlatformIO native); thresholds still to be tuned on real recordings |
+| Device firmware (IMU detector, camera decision logic, camera + IMU fusion, signed reports, replay window) | ✅ 49 unit tests on a laptop (PlatformIO native); logic scored on held-out video; thresholds still to be tuned on real recordings |
 | Camera detector, Lite unit (ESPDet-Pico on ESP32-S3) | 🟡 8-bit model 486 KB, speed-bump mAP50 0.72 in ESP-PPQ simulation; builds and runs in the ESP32-S3 emulator, on-chip accuracy needs a board |
 | V2V radio, cloud, in-vehicle hardware | ⏳ Planned (see roadmap) |
 
@@ -102,7 +102,7 @@ so on-chip accuracy and speed will be measured on a board. Details: [`firmware/R
 [`firmware/espdet_qemu/README.md`](firmware/espdet_qemu/README.md).
 
 ```bash
-cd firmware && pio test -e native          # 30 unit tests
+cd firmware && pio test -e native          # 49 unit tests
 python tools/check_with_engine.py          # signed reports checked from the backend side
 ```
 
@@ -135,7 +135,7 @@ ai/
 firmware/
 ├── lib/icvsp_core/     device logic: IMU detector, event builder, signer, replay guard
 ├── lib/icvsp_sim/      simulated IMU and GNSS
-├── test/               30 unit tests (PlatformIO native)
+├── test/               49 unit tests (PlatformIO native)
 ├── tools/              end-to-end check with the engine
 └── espdet_qemu/        ESPDet-Pico on the ESP32-S3 (ESP-IDF + ESP-DL), run in QEMU
 ```

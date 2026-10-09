@@ -17,8 +17,9 @@ public:
 
     // Writes the event into buf. Returns the length, or 0 if there is no valid fix or buf is too small.
     // msg_id_out (optional) receives the event_id.
+    // `model` overrides the model name given to the constructor (e.g. which sensors confirmed the hazard).
     size_t build(const Detection& d, const GnssFix& fix, char* buf, size_t cap,
-                 char* msg_id_out = nullptr, size_t msg_id_cap = 0);
+                 char* msg_id_out = nullptr, size_t msg_id_cap = 0, const char* model = nullptr);
 
     uint32_t next_seq() const { return seq_; }
 
