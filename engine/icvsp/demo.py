@@ -17,7 +17,7 @@ from .consensus import Engine
 from .model import HazardState
 from .pipeline import Result, evaluate
 from .risk import targets
-from .sim import SCENARIOS, run
+from .sim import SCENARIOS
 
 USE_COLOR = sys.stdout.isatty()
 

@@ -1,0 +1,110 @@
+test_id,v_level,file,test,requirements
+T-01,Unit,engine/tests/test_components.py,Geometry.test_offset_and_distance_agree,(supporting)
+T-02,Unit,engine/tests/test_components.py,Geometry.test_heading_diff_wraps,(supporting)
+T-03,Unit,engine/tests/test_components.py,Schema.test_valid_event_has_no_errors,FR-02 FR-SEC-13
+T-04,Unit,engine/tests/test_components.py,Schema.test_missing_and_bad_fields_are_reported,FR-04 FR-SEC-13
+T-05,Unit,engine/tests/test_components.py,Schema.test_malformed_message_never_reaches_scoring,FR-04 FR-SEC-13
+T-06,Unit,engine/tests/test_components.py,Plausibility.test_future_timestamp_rejected,FR-05 FR-SEC-10
+T-07,Unit,engine/tests/test_components.py,Plausibility.test_poor_gps_rejected_and_mediocre_gps_downgraded,FR-05
+T-08,Unit,engine/tests/test_components.py,Plausibility.test_report_far_from_own_position_downgraded,FR-05
+T-09,Unit,engine/tests/test_components.py,Plausibility.test_teleporting_trace_downgraded,FR-05
+T-10,Unit,engine/tests/test_components.py,Plausibility.test_duplicate_event_id_rejected,FR-06 FR-SEC-10
+T-11,Unit,engine/tests/test_components.py,TrustMath.test_beta_reputation,FR-08
+T-12,Unit,engine/tests/test_components.py,TrustMath.test_freshness_decays,FR-07 FR-13
+T-13,Integration,engine/tests/test_components.py,TraceFormat.test_export_and_reload_gives_the_same_decision,FR-22 NFR-07
+T-14,System,engine/tests/test_scenarios.py,ExpectedStates.test_every_scenario_reaches_its_expected_state,FR-12
+T-15,System,engine/tests/test_scenarios.py,Scenarios.test_single_report_gives_only_an_advisory_to_d,FR-16
+T-16,System,engine/tests/test_scenarios.py,Scenarios.test_duplicates_merge_into_one_hazard_and_warn_only_d,FR-09 FR-15 FR-SEC-11
+T-17,System,engine/tests/test_scenarios.py,Scenarios.test_false_report_is_outvoted_by_negative_evidence_and_costs_reputation,FR-10 FR-08
+T-18,System,engine/tests/test_scenarios.py,Scenarios.test_sybil_identities_collapse_into_one_source,FR-11
+T-19,System,engine/tests/test_scenarios.py,Scenarios.test_sybil_would_win_if_identities_were_counted_separately,FR-11
+T-20,System,engine/tests/test_scenarios.py,Scenarios.test_cloud_outage_does_not_change_the_decision,FR-18 NFR-SEC-04
+T-21,System,engine/tests/test_scenarios.py,Scenarios.test_replayed_old_report_is_rejected,FR-06 FR-SEC-10
+T-22,System,engine/tests/test_scenarios.py,Scenarios.test_gps_spoof_is_downgraded_for_position_mismatch,FR-05
+T-23,Integration,engine/tests/test_stage2.py,Baselines.test_b1_is_fooled_by_a_single_false_report,FR-23
+T-24,Integration,engine/tests/test_stage2.py,Baselines.test_b2_outvotes_one_false_report,FR-23
+T-25,System,engine/tests/test_stage2.py,Baselines.test_b2_is_fooled_by_sybil_identities_but_engine_is_not,FR-11 FR-23
+T-26,Integration,engine/tests/test_stage2.py,Baselines.test_all_deciders_warn_on_a_well_reported_real_hazard,FR-23
+T-27,System,engine/tests/test_stage2.py,NoisyGps.test_a_vehicle_that_reported_is_never_counted_as_saw_nothing,FR-10
+T-28,Unit,engine/tests/test_stage2.py,Metrics.test_counts_and_rates,FR-23
+T-29,Unit,engine/tests/test_stage2.py,Metrics.test_wilson_interval_contains_the_estimate_and_stays_in_range,FR-23
+T-30,Integration,engine/tests/test_stage2.py,Metrics.test_experiment_is_reproducible,FR-21 NFR-07 NFR-12
+T-31,Unit,engine/tests/test_stage2.py,Metrics.test_random_scenarios_have_ground_truth_both_ways,FR-21
+T-32,Unit,engine/tests/test_cold_start.py,ColdStart.test_new_weight_alone_cannot_reach_the_advisory_threshold,FR-07 FR-12
+T-33,System,engine/tests/test_cold_start.py,ColdStart.test_lone_new_vehicle_gets_an_advisory_to_d,FR-12 FR-16
+T-34,System,engine/tests/test_cold_start.py,ColdStart.test_cold_start_never_goes_beyond_an_advisory,FR-12
+T-35,Unit,engine/tests/test_cold_start.py,ColdStart.test_confidence_boundary,FR-12
+T-36,Unit,engine/tests/test_cold_start.py,ColdStart.test_poor_gps_gets_no_cold_start_advisory,FR-05 FR-12
+T-37,System,engine/tests/test_cold_start.py,ColdStart.test_any_negative_evidence_blocks_the_cold_start_advisory,FR-10 FR-12
+T-38,System,engine/tests/test_cold_start.py,ColdStart.test_sybil_identities_get_no_cold_start_advisory_even_with_no_witness,FR-11 FR-12
+T-39,Unit,engine/tests/test_cold_start.py,ColdStart.test_rule_can_be_switched_off,FR-12
+T-40,Unit,engine/tests/test_components.py,Schema.test_speed_bump_is_a_valid_type,FR-02 NFR-11
+T-41,Unit,engine/tests/test_components.py,Schema.test_old_schema_version_is_refused,FR-04 FR-SEC-13
+T-42,Unit,engine/tests/test_components.py,Schema.test_no_gps_means_null_position_never_an_invented_one,FR-02 FR-25
+T-43,Unit,engine/tests/test_components.py,Schema.test_imu_peak_is_optional_but_checked,FR-04 FR-SEC-13
+T-44,Unit,engine/tests/test_components.py,Plausibility.test_report_without_gps_is_logged_but_not_used,FR-05
+T-45,Unit,engine/tests/test_components.py,Plausibility.test_repeated_boot_and_sequence_is_rejected,FR-06 FR-SEC-09 FR-SEC-10
+T-46,Unit,engine/tests/test_components.py,TrustMath.test_bump_and_pothole_reports_at_one_spot_stay_separate,FR-09 NFR-11
+F-01,Unit,firmware/test/test_bump_detector/test_main.cpp,test_speed_bump_is_detected_once_as_bump,FR-01
+F-02,Unit,firmware/test/test_bump_detector/test_main.cpp,test_pothole_is_detected_as_pothole,FR-01
+F-03,Unit,firmware/test/test_bump_detector/test_main.cpp,test_severity_follows_the_size_of_the_jolt,FR-01 FR-02
+F-04,Unit,firmware/test/test_bump_detector/test_main.cpp,test_normal_vibration_gives_no_reports,FR-01 NFR-03
+F-05,Unit,firmware/test/test_bump_detector/test_main.cpp,test_rough_road_raises_the_threshold,FR-01 NFR-03
+F-06,Unit,firmware/test/test_bump_detector/test_main.cpp,test_braking_is_not_a_hazard,FR-01 NFR-03
+F-07,Unit,firmware/test/test_bump_detector/test_main.cpp,test_jolts_while_parked_are_ignored,FR-01 NFR-03
+F-08,Unit,firmware/test/test_bump_detector/test_main.cpp,test_one_report_per_hazard_but_separate_hazards_are_kept,FR-01
+F-09,Unit,firmware/test/test_bump_detector/test_main.cpp,test_nothing_is_reported_during_warmup,FR-01 NFR-03
+F-10,Unit,firmware/test/test_event_builder/test_main.cpp,test_utc_formatting,FR-02 FR-25
+F-11,Unit,firmware/test/test_event_builder/test_main.cpp,test_event_has_the_exact_expected_bytes,FR-02 FR-SEC-06
+F-12,Unit,firmware/test/test_event_builder/test_main.cpp,test_event_ids_count_up,FR-SEC-09
+F-13,Unit,firmware/test/test_event_builder/test_main.cpp,test_speed_bump_type,FR-02 NFR-11
+F-14,Unit,firmware/test/test_event_builder/test_main.cpp,test_ids_include_the_boot_so_they_never_repeat_after_a_restart,FR-06 FR-SEC-09
+F-15,Unit,firmware/test/test_event_builder/test_main.cpp,test_camera_only_report_has_no_imu_peak,FR-02
+F-16,Unit,firmware/test/test_event_builder/test_main.cpp,test_no_position_fix_means_null_position_not_an_invented_one,FR-02 FR-25
+F-17,Unit,firmware/test/test_event_builder/test_main.cpp,test_no_event_before_gnss_time_is_known,FR-25
+F-18,Unit,firmware/test/test_event_builder/test_main.cpp,test_buffer_too_small_is_refused,FR-02
+F-19,Unit,firmware/test/test_event_builder/test_main.cpp,test_heading_stays_in_range,FR-02
+F-20,Unit,firmware/test/test_fusion/test_main.cpp,test_matching_imu_and_rear_camera_become_one_stronger_report,FR-01 FR-09
+F-21,Unit,firmware/test/test_fusion/test_main.cpp,test_imu_alone_is_reported_after_the_window,FR-01
+F-22,Unit,firmware/test/test_fusion/test_main.cpp,test_camera_alone_is_reported_with_its_own_confidence,FR-01
+F-23,Unit,firmware/test/test_fusion/test_main.cpp,test_camera_too_late_is_a_separate_report,FR-01
+F-24,Unit,firmware/test/test_fusion/test_main.cpp,test_imu_decides_the_type_when_sensors_disagree,FR-01
+F-25,Unit,firmware/test/test_fusion/test_main.cpp,test_forward_camera_waits_for_the_impact,FR-01
+F-26,Unit,firmware/test/test_fusion/test_main.cpp,test_flush_reports_everything_pending,FR-01
+F-27,Unit,firmware/test/test_hazard_tracker/test_main.cpp,test_receding_bump_is_confirmed_once,FR-01 NFR-03
+F-28,Unit,firmware/test/test_hazard_tracker/test_main.cpp,test_single_frame_flicker_is_not_reported,FR-01 NFR-03
+F-29,Unit,firmware/test/test_hazard_tracker/test_main.cpp,test_three_of_five_frames_confirms_a_pothole,FR-01 NFR-03
+F-30,Unit,firmware/test/test_hazard_tracker/test_main.cpp,test_static_bump_box_like_a_kerb_is_rejected,FR-01 NFR-03
+F-31,Unit,firmware/test/test_hazard_tracker/test_main.cpp,test_bump_moving_the_wrong_way_is_rejected,FR-01 NFR-03
+F-32,Unit,firmware/test/test_hazard_tracker/test_main.cpp,test_forward_camera_expects_the_opposite_motion,FR-01 NFR-03
+F-33,Unit,firmware/test/test_hazard_tracker/test_main.cpp,test_bump_outside_the_road_region_is_ignored,FR-01 NFR-03
+F-34,Unit,firmware/test/test_hazard_tracker/test_main.cpp,test_road_mask_overrides_the_region_when_available,FR-01 NFR-03
+F-35,Unit,firmware/test/test_hazard_tracker/test_main.cpp,test_low_confidence_boxes_are_ignored,FR-01 NFR-03
+F-36,Unit,firmware/test/test_hazard_tracker/test_main.cpp,test_nothing_is_reported_while_parked,FR-01 NFR-03
+F-37,Unit,firmware/test/test_hazard_tracker/test_main.cpp,test_two_separate_potholes_give_two_reports,FR-01 NFR-03
+F-38,Unit,firmware/test/test_hazard_tracker/test_main.cpp,test_a_gap_longer_than_allowed_starts_a_new_track,FR-01 NFR-03
+F-39,Unit,firmware/test/test_replay_guard/test_main.cpp,test_fresh_message_is_accepted_once,FR-06 FR-SEC-10
+F-40,Unit,firmware/test/test_replay_guard/test_main.cpp,test_same_id_from_another_sender_is_a_different_message,FR-06 FR-SEC-10
+F-41,Unit,firmware/test/test_replay_guard/test_main.cpp,test_old_messages_are_stale,FR-06 FR-SEC-10
+F-42,Unit,firmware/test/test_replay_guard/test_main.cpp,test_messages_from_the_future_are_refused,FR-06 FR-SEC-10
+F-43,Unit,firmware/test/test_replay_guard/test_main.cpp,test_window_is_configurable,FR-06 FR-SEC-10
+F-44,Unit,firmware/test/test_replay_guard/test_main.cpp,test_old_ids_are_forgotten_after_the_window,FR-06 FR-SEC-10
+F-45,Unit,firmware/test/test_replay_guard/test_main.cpp,test_full_table_refuses_rather_than_forgets,FR-06 FR-SEC-10
+F-46,Unit,firmware/test/test_signer/test_main.cpp,test_rfc8032_vector_1,NFR-10 FR-SEC-05
+F-47,Unit,firmware/test/test_signer/test_main.cpp,test_signed_message_verifies,NFR-10 FR-SEC-05 FR-SEC-07
+F-48,Unit,firmware/test/test_signer/test_main.cpp,test_any_change_breaks_the_signature,NFR-10 FR-SEC-06 FR-SEC-07
+F-49,Unit,firmware/test/test_signer/test_main.cpp,test_another_key_does_not_verify,NFR-10 FR-SEC-07
+F-50,Unit,firmware/test/test_signer/test_main.cpp,test_seed_is_wiped,NFR-10
+F-51,Unit,firmware/test/test_signer/test_main.cpp,test_too_long_message_is_refused,NFR-10
+F-52,Unit,firmware/test/test_signer/test_main.cpp,test_hex_round_trip_and_bad_input,NFR-10
+IT-01,Integration,firmware/tools/check_with_engine.py,device reports pass engine schema; Ed25519 verified by independent library; tampered/re-timed rejected,FR-02 FR-04 NFR-10 FR-SEC-05 FR-SEC-07 FR-SEC-13
+E-01,System,engine/icvsp/experiment.py,"Stage 2: engine vs baselines, 2000 runs per setting",NFR-03 NFR-04 NFR-05 NFR-06
+E-02,Software (ML),ai/scripts (Ultralytics val),"Detector accuracy per class on public SBP-YOLO test set (1,104 images)",FR-01
+E-03,Software (ML),ai/scripts/event_recall.py,"Detector on held-out Cairo videos (night, day), per class",FR-01 NFR-03
+E-04,Software (ML),ai/scripts/espdet_quantize.py,8-bit chip model accuracy via ESP-PPQ,FR-01 NFR-13
+E-05,System,firmware/tools/score_logic.py,Device decision logic replayed on held-out video detections,FR-01 NFR-03
+E-06,Integration,firmware/espdet_qemu,"Chip program in ESP32-S3 emulator: builds, runs; detections not valid in emulator",NFR-13
+I-01,Inspection,engine/ (python3 -m icvsp.demo all),Decision log lists the reasons for every decision,FR-14
+I-02,Inspection,engine/icvsp/config.py,Type-specific settings; second type (speed_bump) added without consensus changes,NFR-11
+I-03,Inspection,"engine/tests, firmware/test",Test suite runtime and coverage of testable Must requirements,NFR-14
+I-04,Inspection,engine/results,"Results folder holds config, seed, raw counts and summary",NFR-12

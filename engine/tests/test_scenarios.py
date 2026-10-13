@@ -1,7 +1,6 @@
 """The scripted scenarios are the specification: each one must reach its expected outcome."""
 import unittest
 
-from icvsp.model import HazardState
 from icvsp.pipeline import evaluate
 from icvsp.sim import EXPECTED, SCENARIOS
 

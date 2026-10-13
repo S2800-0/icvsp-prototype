@@ -1,0 +1,78 @@
+id,set,priority,requirement
+FR-01,system,Must,"The edge device shall detect potholes from its camera and output a detection with a confidence value, without streaming raw video."
+FR-02,system,Must,The system shall turn each detection plus vehicle context into a Safety Event that conforms to the Safety Event schema.
+FR-03,system,Must,"Each vehicle shall broadcast periodic position beacons (id, time, position, speed, heading, detector-active flag)."
+FR-04,system,Must,The system shall reject malformed Safety Events before any other processing.
+FR-05,system,Must,The system shall run plausibility checks on each event and reject or downgrade implausible ones.
+FR-06,system,Must,The system shall protect against replayed events.
+FR-07,system,Must,"The system shall compute a trust weight for every accepted report from detection confidence, consistency, source reliability and freshness."
+FR-08,system,Must,"The system shall maintain a reliability score per source, updated only after confident outcomes."
+FR-09,system,Must,The system shall merge reports of the same hazard into one logical hazard.
+FR-10,system,Must,The system shall count vehicles that drove over the spot with the detector active and did not report as evidence against the hazard.
+FR-11,system,Must,The system shall count identities that move as one as a single source.
+FR-12,system,Must,"The system shall classify each hazard as Suppressed, Unconfirmed, Corroborated, Confirmed or Expired using explicit rules."
+FR-13,system,Should,The system shall expire hazards whose supporting evidence is no longer fresh.
+FR-14,system,Must,"The system shall record a human-readable reason for every decision, including decisions not to warn."
+FR-15,system,Must,The system shall warn only vehicles exposed to the hazard.
+FR-16,system,Must,The alert level shall follow the hazard state.
+FR-17,system,Must,"The driver app shall present warnings visually and audibly, with distance to the hazard."
+FR-18,system,Must,The real-time decision path shall not depend on the cloud.
+FR-19,system,Should,The system shall store events and decisions in the cloud for road-segment history and analytics.
+FR-20,system,Should,The system shall maintain a lightweight Safety Digital Twin of road-segment state.
+FR-21,system,Must,"The simulator shall generate honest, faulty and malicious traffic reproducibly."
+FR-22,system,Should,The system shall accept vehicle traces and events from files in a documented format.
+FR-23,system,Must,The evaluation shall compare the engine with two baselines on the same inputs.
+NFR-01,system,Must,End-to-end latency on the local path (detection to warning) shall be ≤ 500 ms median.
+NFR-02,system,Must,Warnings shall reach an exposed vehicle ≥ 4 s before it reaches the hazard at 60 km/h (≈ 67 m).
+NFR-03,system,Must,False-alert rate shall be ≤ 5% of issued warnings.
+NFR-04,system,Must,Consensus accuracy shall be ≥ 90%.
+NFR-05,system,Must,"With up to 30% faulty or malicious reports, the false-alert rate shall stay ≤ 10%."
+NFR-06,system,Should,"With 10% packet loss, accuracy shall stay ≥ 90%."
+NFR-07,system,Must,"Given the same inputs and configuration, the system shall make the same decisions."
+NFR-08,system,Must,Every decision shall be traceable to its input events and the configuration version.
+NFR-09,system,Must,Raw camera video shall not be continuously transmitted off the vehicle.
+NFR-10,system,Must,"Every message between vehicles, and between a vehicle and the cloud, shall carry an authenticated sender identity and be integrity-protected."
+NFR-11,system,Should,A new hazard type shall be addable without changing the consensus logic.
+NFR-12,system,Must,"Every experiment shall record its configuration, seed and results."
+NFR-13,system,Must,The in-vehicle hardware shall be selected by benchmark: it shall run the chosen pothole detector in real time within the power and cost budget.
+NFR-14,system,Should,The automated test suite shall run in under one minute and cover every Must requirement that can be tested automatically.
+FR-24,system,Must,"A Safety Event shall reach following vehicles within radio range without the cloud (direct V2V), and through a cloud relay when they are out of range."
+FR-25,system,Must,"The in-vehicle unit shall be the single trusted source of time and position (GNSS), and its interface to the mobile app shall define timestamp alignment and behaviour on communication loss."
+FR-26,system,Must,The in-vehicle unit shall warn its own driver about hazards in its local hazard cache without the cloud or any other vehicle.
+FR-SEC-01,security,Core,Authenticate users before protected functionality.
+FR-SEC-02,security,Core,"Enforce Driver, Ambulance, and Administrator authorization on the backend."
+FR-SEC-03,security,Core,Assign each registered device a unique identity associated with an Ed25519 public key.
+FR-SEC-04,security,Core,Use controlled prototype provisioning to register device identity and public key.
+FR-SEC-05,security,Core,Digitally sign hazard reports on the originating edge device with its Ed25519 private key before relay through the phone/backend.
+FR-SEC-06,security,Core,Use deterministic/canonical representation of signed fields (Section 1 format).
+FR-SEC-07,security,Core,Verify the originating device's hazard-report signature at the backend using the public key registered to the claimed Device ID.
+FR-SEC-08,security,Core,Use HTTPS/TLS 1.3 for the phone/app-to-backend IP transport.
+FR-SEC-09,security,Core,Include a unique Message ID (Device ID + boot counter + sequence number) and the signed send time in each message.
+FR-SEC-10,security,Core,Reject replayed or stale messages using a configurable freshness window on the send time and a seen-ID table kept for the maximum report age.
+FR-SEC-11,security,Core,Correlate independent reports of the same physical hazard without discarding their evidence.
+FR-SEC-12,security,Core,Support ACTIVE/REVOKED device status and reject reports from revoked devices.
+FR-SEC-13,security,Core,Validate externally supplied hazard fields and schema.
+FR-SEC-14,security,Core,Protect backend-to-phone/app cooperative-alert transport using HTTPS/TLS 1.3.
+FR-SEC-15,security,Core,Digitally sign cooperative alerts with the backend Ed25519 signing key.
+FR-SEC-16,security,Core,Provision the receiving phone/app with a trusted backend verification key/trust anchor.
+FR-SEC-17,security,Core,Verify backend alert authenticity in the receiving phone/app before display/action.
+FR-SEC-18,security,Core,Reject duplicate or expired cooperative alerts.
+FR-SEC-19,security,Core,Require authenticated/authorized access to protected cooperative alert services.
+FR-SEC-20,security,Core,Apply configurable rate limits to externally accessible/security-sensitive APIs.
+FR-SEC-21,security,Core,Record security-relevant events without logging prohibited secrets/sensitive data.
+NFR-SEC-01,security,Core,"Only required permissions for users, services, and cloud roles."
+NFR-SEC-02,security,Core,"No hardcoded credentials, tokens, cloud secrets, or private keys."
+NFR-SEC-03,security,Core,Encrypt sensitive cloud/backend data using platform-supported controls.
+NFR-SEC-04,security,Core,Local immediate alerts continue without backend/cloud connectivity.
+NFR-SEC-05,security,Core,Measure cryptographic/security overhead on the actual target hardware.
+NFR-SEC-06,security,Core,"Minimize collection, access, retention, and exposure of user/location/device data."
+NFR-SEC-07,security,Core,Run security checks relevant to the final stack before deployment.
+NFR-SEC-08,security,Core,"Use restricted access, encryption, and S3 Block Public Access."
+NFR-SEC-09,security,Core,Retain sufficient security evidence without unnecessary sensitive data.
+SEC-EXT-A,security,Conditional: direct V2V,"Each direct cooperative beacon must be Ed25519-signed. Receivers verify sender key, freshness, and replay state before use. TLS is not assumed for broadcast."
+SEC-EXT-B,security,Platform dependent,Dedicated edge devices should use secure boot where supported and accept only authenticated/signed firmware update artifacts according to the selected platform mechanism.
+SEC-EXT-C,security,Core,"Document provisioning, active use, rotation/replacement, revocation, and response to suspected compromise of device or backend signing keys."
+SEC-EXT-D,security,Conditional: direct V2V,"If direct V2V is used, define how receivers obtain sufficiently recent revocation/trust information; offline limitations must be explicit."
+SEC-EXT-E,security,Core,"Treat physical access to an edge device as a threat to stored keys, firmware, and configuration; prototype mitigations depend on the selected hardware."
+SEC-EXT-F,security,Future / privacy,Minimize persistent identifiers and location retention. Rotating pseudonymous vehicle identifiers are future work unless implemented and validated with revocation/trust logic.
+SEC-EXT-G,security,Core; WAF/GuardDuty stretch,"Detect configured suspicious activity, preserve evidence, alert the team, and support limited response such as rate limiting, WAF action if enabled, or device revocation."

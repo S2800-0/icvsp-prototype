@@ -106,6 +106,13 @@ cd firmware && pio test -e native          # 52 unit tests
 python tools/check_with_engine.py          # signed reports checked from the backend side
 ```
 
+### Verification
+
+Every push runs the V-cycle checks on GitHub Actions: 98 unit and scenario tests (52 device, 46 engine), the
+device → engine integration check, static analysis, and a traceability check that links every test to the
+requirement IDs of the team's V-cycle workbooks and fails if a test is unlisted or failing. The
+requirement → test → result report appears on each run's summary page. Details: [`verification/`](verification/).
+
 ## Try it
 
 - **Reproduce training:** [`ai/ICVSP_train_kaggle.ipynb`](ai/ICVSP_train_kaggle.ipynb) runs unattended on Kaggle (recommended for

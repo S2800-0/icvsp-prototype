@@ -1,0 +1,81 @@
+# V-cycle verification on every push: unit, integration and traceability checks.
+# Security scans (Gitleaks, Semgrep, Trivy) are added by the cybersecurity team (Gantt C2).
+name: verification
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Unit + integration tests, traceability
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: platformio-${{ runner.os }}-${{ hashFiles('firmware/platformio.ini') }}
+      - name: Install tools
+        run: pip install platformio cryptography coverage
+
+      - name: Trust engine tests (unit, integration, system scenarios)
+        working-directory: engine
+        run: coverage run -m unittest -v 2>&1 | tee ../engine.log
+
+      - name: Engine coverage
+        working-directory: engine
+        run: coverage report -m --include="icvsp/*" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Device firmware unit tests (PlatformIO native)
+        working-directory: firmware
+        run: pio test -e native -v | tee ../firmware.log
+
+      - name: Device -> engine integration (signed reports, independent Ed25519 check)
+        working-directory: firmware
+        run: python tools/check_with_engine.py | tee ../integration.log
+
+      - name: Requirement traceability
+        run: |
+          python verification/check_traceability.py --engine-log engine.log --firmware-log firmware.log \
+            --integration-log integration.log --out traceability_report.md
+          cat traceability_report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: verification-evidence
+          path: |
+            engine.log
+            firmware.log
+            integration.log
+            traceability_report.md
+
+  static-analysis:
+    name: Static analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Python (ruff, pyflakes rules)
+        run: |
+          pip install ruff
+          ruff check --select F engine firmware/tools verification
+          ruff check --select E9,F63,F7,F82 ai/scripts
+      - name: C++ (cppcheck)
+        # reported but not yet blocking: switched to blocking once the first report is clean
+        continue-on-error: true
+        run: |
+          sudo apt-get update -q && sudo apt-get install -y -q cppcheck
+          cppcheck --std=c++17 --enable=warning,performance,portability --error-exitcode=1 --inline-suppr \
+            --suppress=missingIncludeSystem -I firmware/lib/icvsp_core/src -I firmware/lib/icvsp_sim/src \
+            firmware/lib/icvsp_core/src firmware/lib/icvsp_sim/src firmware/src

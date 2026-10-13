@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from .cloud import CloudSync
 from .config import Config
 from .consensus import Engine, Report
-from .model import Beacon
 from .risk import Skipped, Target, targets
 from .sim import Scenario, SimOutput, run
 from .trust import Reputation
