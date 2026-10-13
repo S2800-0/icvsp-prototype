@@ -28,6 +28,7 @@ struct FusedHazard {
     float confidence;
     Severity severity;   // from the IMU; Low for camera-only reports
     uint8_t sensors;     // SensorBits
+    float imu_peak;      // largest vertical jolt felt by the IMU, m/s^2; 0 for camera-only reports
 };
 
 struct FusionConfig {
@@ -56,6 +57,7 @@ private:
         HazardType type;
         float conf;
         Severity severity;
+        float peak;
     };
     bool in_window(uint32_t t_imu, uint32_t t_cam) const;
     void push(const Pending& p);

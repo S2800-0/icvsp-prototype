@@ -24,6 +24,7 @@ void test_matching_imu_and_rear_camera_become_one_stronger_report() {
     TEST_ASSERT_EQUAL(kSensorImu | kSensorCamera, out[0].sensors);
     TEST_ASSERT_FLOAT_WITHIN(1e-4f, 1.0f - 0.3f * 0.4f, out[0].confidence);  // 0.88
     TEST_ASSERT_EQUAL_UINT32(10000, out[0].t_ms);  // position of the impact
+    TEST_ASSERT_FLOAT_WITHIN(1e-4f, 6.0f, out[0].imu_peak);  // jolt strength kept for the report
     TEST_ASSERT_EQUAL(0, f.poll(20000, out, 4));
 }
 
@@ -44,6 +45,7 @@ void test_camera_alone_is_reported_with_its_own_confidence() {
     TEST_ASSERT_EQUAL(1, f.poll(5000, out, 4));
     TEST_ASSERT_EQUAL(kSensorCamera, out[0].sensors);
     TEST_ASSERT_EQUAL(Severity::Low, out[0].severity);
+    TEST_ASSERT_EQUAL_FLOAT(0.0f, out[0].imu_peak);  // nothing felt
     TEST_ASSERT_FLOAT_WITHIN(1e-4f, 0.55f, out[0].confidence);
 }
 

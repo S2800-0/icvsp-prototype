@@ -45,17 +45,34 @@ class Schema(unittest.TestCase):
 
     def test_missing_and_bad_fields_are_reported(self):
         d = event().to_dict()
-        del d["source"]
-        d["confidence"] = 1.7
+        del d["device_id"]
+        d["detection_confidence"] = 1.7
         d["extra"] = 1
         errs = schema_errors(d)
-        self.assertTrue(any("source" in e for e in errs))
+        self.assertTrue(any("device_id" in e for e in errs))
         self.assertTrue(any("extra" in e for e in errs))
+
+    def test_old_schema_version_is_refused(self):
+        d = event().to_dict()
+        d["schema_version"] = 1
+        self.assertTrue(any("schema_version" in e for e in schema_errors(d)))
+
+    def test_no_gps_means_null_position_never_an_invented_one(self):
+        ok = event(gps_valid=False, lat=None, lon=None, acc_m=None, speed_kmh=None, heading_deg=None).to_dict()
+        self.assertEqual(schema_errors(ok), [])
+        invented = event(gps_valid=False).to_dict()
+        self.assertTrue(any("must be null" in e for e in schema_errors(invented)))
+
+    def test_imu_peak_is_optional_but_checked(self):
+        self.assertEqual(schema_errors(event(imu_peak_g=1.6).to_dict()), [])
+        d = event().to_dict()
+        d["imu_peak_g"] = -1
+        self.assertTrue(schema_errors(d))
 
     def test_malformed_message_never_reaches_scoring(self):
         eng = Engine(CFG)
         d = event().to_dict()
-        d["confidence"] = "high"
+        d["detection_confidence"] = "high"
         self.assertFalse(eng.ingest_dict(d))
         rep = eng.decide(BASE_T)
         self.assertEqual(rep.decisions, [])
@@ -63,6 +80,22 @@ class Schema(unittest.TestCase):
 
 
 class Plausibility(unittest.TestCase):
+    def test_report_without_gps_is_logged_but_not_used(self):
+        ev = event(gps_valid=False, lat=None, lon=None, acc_m=None, speed_kmh=None, heading_deg=None)
+        chk = plausibility(ev, [], BASE_T, CFG)
+        self.assertEqual(chk.verdict, "reject")
+        self.assertIn("no valid GPS", chk.reasons[0])
+
+    def test_repeated_boot_and_sequence_is_rejected(self):
+        eng = Engine(CFG)
+        a = event(event_id="A-3-7", boot_id=3, sequence=7)
+        b = event(event_id="A-3-7-copy", boot_id=3, sequence=7)   # same device, boot and sequence, new id
+        eng.ingest_beacon(beacon_at(a))
+        for ev in (a, b):
+            self.assertTrue(eng.ingest_dict(ev.to_dict()))
+        rep = eng.decide(BASE_T + 1)
+        self.assertTrue(any("sequence 7" in r for x in rep.rejected for r in x.reasons))
+
     def test_future_timestamp_rejected(self):
         ev = event(t=BASE_T + 60)
         self.assertEqual(plausibility(ev, [], BASE_T, CFG).verdict, "reject")

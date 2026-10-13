@@ -49,10 +49,12 @@ def main():
         args = (r['sender'], r['msg_id'], r['utc_ms'])
         ev = r['event']
         errs = schema_errors(ev)
+        if ev.get('device_id') != r['sender'] or ev.get('event_id') != r['msg_id']:
+            errs.append('event device_id / event_id differ from the signed envelope')
         good = verifies(key, sig, *args, payload)
         tampered = verifies(key, sig, *args, payload.replace(b'"severity":"', b'"severity":"x'))
         retimed = verifies(key, sig, r['sender'], r['msg_id'], r['utc_ms'] + 60000, payload)
-        print(f"{ev['event_id']:16} {ev['type']:10} {ev['severity']:6} conf {ev['confidence']:.2f}  "
+        print(f"{ev['event_id']:18} {ev['type']:10} {ev['severity']:6} conf {ev['detection_confidence']:.2f}  "
               f"engine: {'valid' if not errs else '; '.join(errs)}  signature: {'ok' if good else 'BAD'}  "
               f"tampered/retimed rejected: {not tampered and not retimed}")
         ok &= good and not tampered and not retimed and not errs

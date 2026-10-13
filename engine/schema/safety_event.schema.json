@@ -1,31 +1,41 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://icvsp.local/schema/safety_event.schema.json",
-  "title": "Safety Event",
-  "description": "One hazard observation as sent by a vehicle. Fields added by the platform (verification, trust weight, consensus) are not part of the message.",
+  "title": "Safety Event (schema version 2)",
+  "description": "One hazard observation as sent by a vehicle device. Version 2 merges the device format with the mobile design (boot_id + sequence, gps_valid, imu_peak_g, clearer names). The device signs these exact bytes, so the phone must forward them unchanged. Fields added by the platform (verification, trust weight, consensus) are not part of the message.",
   "type": "object",
-  "required": ["event_id", "type", "timestamp", "location", "road_segment", "speed_kmh", "heading", "severity", "confidence", "source"],
+  "required": ["schema_version", "event_id", "device_id", "boot_id", "sequence", "type", "detected_at", "gps_valid",
+               "latitude", "longitude", "position_accuracy_m", "speed_kmh", "heading_deg", "severity",
+               "detection_confidence"],
   "additionalProperties": false,
   "properties": {
-    "event_id": { "type": "string", "minLength": 1 },
+    "schema_version": { "const": 2 },
+    "event_id": { "type": "string", "minLength": 1, "description": "Unique per event: device_id-boot_id-sequence. Upload idempotency key." },
+    "device_id": { "type": "string", "minLength": 1 },
+    "boot_id": { "type": "integer", "minimum": 0, "description": "Increases at every device start, so sequence numbers never repeat." },
+    "sequence": { "type": "integer", "minimum": 1, "description": "Counts events within one boot." },
     "type": { "type": "string", "enum": ["pothole", "speed_bump"] },
-    "timestamp": { "type": "string", "format": "date-time" },
-    "location": {
-      "type": "object",
-      "required": ["lat", "lon", "acc_m"],
-      "additionalProperties": false,
-      "properties": {
-        "lat": { "type": "number", "minimum": -90, "maximum": 90 },
-        "lon": { "type": "number", "minimum": -180, "maximum": 180 },
-        "acc_m": { "type": "number", "exclusiveMinimum": 0 }
-      }
-    },
-    "road_segment": { "type": "string", "minLength": 1 },
-    "speed_kmh": { "type": "number", "minimum": 0 },
-    "heading": { "type": "number", "minimum": 0, "exclusiveMaximum": 360 },
+    "detected_at": { "type": "string", "format": "date-time", "description": "Capture time (GNSS UTC). Never changed by later delivery." },
+    "gps_valid": { "type": "boolean", "description": "false: no position fix; position fields are null and no location is invented." },
+    "latitude": { "type": ["number", "null"], "minimum": -90, "maximum": 90 },
+    "longitude": { "type": ["number", "null"], "minimum": -180, "maximum": 180 },
+    "position_accuracy_m": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+    "road_segment": { "type": "string", "minLength": 1, "description": "Optional coarse grid cell; the backend may map reports to real roads instead." },
+    "speed_kmh": { "type": ["number", "null"], "minimum": 0 },
+    "heading_deg": { "type": ["number", "null"], "minimum": 0, "exclusiveMaximum": 360 },
     "severity": { "type": "string", "enum": ["low", "medium", "high"] },
-    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
-    "source": { "type": "string", "minLength": 1 },
-    "model": { "type": "string" }
-  }
+    "detection_confidence": { "type": "number", "minimum": 0, "maximum": 1, "description": "How sure the device's sensors are (camera and/or IMU). Not severity, not trust." },
+    "imu_peak_g": { "type": "number", "minimum": 0, "description": "Largest vertical jolt in g; present when the IMU felt the hazard." },
+    "model": { "type": "string", "description": "Which sensors and versions confirmed it, e.g. imu-v0, cam-v0, imu+cam-v0." }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "gps_valid": { "const": true } } },
+      "then": { "properties": { "latitude": { "type": "number" }, "longitude": { "type": "number" },
+                                "position_accuracy_m": { "type": "number" }, "speed_kmh": { "type": "number" },
+                                "heading_deg": { "type": "number" } } },
+      "else": { "properties": { "latitude": { "type": "null" }, "longitude": { "type": "null" },
+                                "position_accuracy_m": { "type": "null" } } }
+    }
+  ]
 }

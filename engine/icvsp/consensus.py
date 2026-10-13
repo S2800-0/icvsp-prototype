@@ -103,7 +103,7 @@ class Engine:
         """Accept a raw Safety Event message; malformed messages are rejected before anything else."""
         errs = schema_errors(d)
         if errs:
-            self.malformed.append(Rejected(str(d.get("event_id", "?")), str(d.get("source", "?")),
+            self.malformed.append(Rejected(str(d.get("event_id", "?")), str(d.get("device_id", "?")),
                                            ["schema: " + e for e in errs]))
             return False
         self.inbox.append(SafetyEvent.from_dict(d))
@@ -118,11 +118,17 @@ class Engine:
 
         accepted: list[Scored] = []
         seen_ids: set[str] = set()
+        seen_seq: set[tuple[str, int, int]] = set()
         for ev in sorted(self.inbox, key=lambda e: e.t):
             if ev.event_id in seen_ids:
                 report.rejected.append(Rejected(ev.event_id, ev.source, ["duplicate event_id (replay protection)"]))
                 continue
+            if (ev.source, ev.boot_id, ev.sequence) in seen_seq:
+                report.rejected.append(Rejected(ev.event_id, ev.source,
+                                                [f"repeated boot {ev.boot_id} / sequence {ev.sequence} from this device"]))
+                continue
             seen_ids.add(ev.event_id)
+            seen_seq.add((ev.source, ev.boot_id, ev.sequence))
             chk = plausibility(ev, self.traces.get(ev.source, []), now, cfg)
             if chk.verdict == "reject":
                 report.rejected.append(Rejected(ev.event_id, ev.source, chk.reasons))
@@ -178,7 +184,7 @@ class Engine:
         # A vehicle that reported this hazard type nearby (even if its report landed in a
         # neighbouring cluster because of GPS error) is never counted against it.
         reported_nearby = {e.source for e in self.inbox
-                           if e.type == head.type
+                           if e.type == head.type and e.gps_valid
                            and distance_m(lat, lon, e.lat, e.lon) <= 3 * cfg.merge_radius_m + e.acc_m
                            and heading_diff(e.heading_deg, heading) <= cfg.heading_tol_deg}
         contra: list[Evidence] = []

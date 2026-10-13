@@ -32,24 +32,37 @@ void grid_cell(double lat, double lon, char* out, size_t cap) {
 
 size_t EventBuilder::build(const Detection& d, const GnssFix& fix, char* buf, size_t cap,
                            char* msg_id_out, size_t msg_id_cap, const char* model) {
-    if (!fix.valid || fix.acc_m <= 0) return 0;
-    char id[48], ts[25], cell[40];
-    std::snprintf(id, sizeof id, "%s-%lu", device_id_, static_cast<unsigned long>(seq_));
+    if (fix.utc_ms <= 0) return 0;  // no GNSS time yet: the capture time would be unknown
+    const bool located = fix.valid && fix.acc_m > 0;
+    char id[64], ts[25], where[200], peak[32] = "";
+    std::snprintf(id, sizeof id, "%s-%lu-%lu", device_id_, static_cast<unsigned long>(boot_id_),
+                  static_cast<unsigned long>(seq_));
     format_utc(fix.utc_ms, ts);
-    grid_cell(fix.lat, fix.lon, cell, sizeof cell);
-    float heading = std::fmod(fix.heading_deg, 360.0f);
-    if (heading < 0) heading += 360.0f;
-    if (heading >= 359.95f) heading = 0.0f;  // keeps the printed value below 360
-    const float speed = fix.speed_kmh > 0 ? fix.speed_kmh : 0.0f;
+    if (located) {
+        char cell[40];
+        grid_cell(fix.lat, fix.lon, cell, sizeof cell);
+        float heading = std::fmod(fix.heading_deg, 360.0f);
+        if (heading < 0) heading += 360.0f;
+        if (heading >= 359.95f) heading = 0.0f;  // keeps the printed value below 360
+        const float speed = fix.speed_kmh > 0 ? fix.speed_kmh : 0.0f;
+        std::snprintf(where, sizeof where,
+                      "\"gps_valid\":true,\"latitude\":%.6f,\"longitude\":%.6f,\"position_accuracy_m\":%.1f,"
+                      "\"road_segment\":\"%s\",\"speed_kmh\":%.1f,\"heading_deg\":%.1f",
+                      fix.lat, fix.lon, fix.acc_m, cell, speed, heading);
+    } else {
+        std::snprintf(where, sizeof where,
+                      "\"gps_valid\":false,\"latitude\":null,\"longitude\":null,\"position_accuracy_m\":null,"
+                      "\"speed_kmh\":null,\"heading_deg\":null");
+    }
+    if (d.peak > 0) std::snprintf(peak, sizeof peak, ",\"imu_peak_g\":%.2f", d.peak / 9.80665f);
 
     const int n = std::snprintf(
         buf, cap,
-        "{\"event_id\":\"%s\",\"type\":\"%s\",\"timestamp\":\"%s\","
-        "\"location\":{\"lat\":%.6f,\"lon\":%.6f,\"acc_m\":%.1f},\"road_segment\":\"%s\","
-        "\"speed_kmh\":%.1f,\"heading\":%.1f,\"severity\":\"%s\",\"confidence\":%.2f,"
-        "\"source\":\"%s\",\"model\":\"%s\"}",
-        id, to_string(d.type), ts, fix.lat, fix.lon, fix.acc_m, cell, speed, heading,
-        to_string(d.severity), d.confidence, device_id_, model ? model : model_);
+        "{\"schema_version\":2,\"event_id\":\"%s\",\"device_id\":\"%s\",\"boot_id\":%lu,\"sequence\":%lu,"
+        "\"type\":\"%s\",\"detected_at\":\"%s\",%s,\"severity\":\"%s\",\"detection_confidence\":%.2f%s,"
+        "\"model\":\"%s\"}",
+        id, device_id_, static_cast<unsigned long>(boot_id_), static_cast<unsigned long>(seq_), to_string(d.type),
+        ts, where, to_string(d.severity), d.confidence, peak, model ? model : model_);
     if (n < 0 || static_cast<size_t>(n) >= cap) return 0;
     if (msg_id_out && msg_id_cap) std::snprintf(msg_id_out, msg_id_cap, "%s", id);
     ++seq_;

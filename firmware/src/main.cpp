@@ -9,6 +9,7 @@
 // On the board the same loop will read the real IMU and GNSS; that part is a placeholder until we have one.
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 
 #include "bump_detector.h"
@@ -21,7 +22,7 @@ namespace {
 
 // Demo key only: a fixed, public seed. Real devices generate their seed once and keep it in
 // encrypted flash; it must never be in source code.
-const char* kDemoSeedHex = "4c4f43414c2d44454d4f2d4b45592d444f2d4e4f542d5553452d494e2d43415221";
+const char* kDemoSeedHex = "4c4f43414c2d44454d4f2d4b45592d444f2d4e4f542d5553452d494e2d434152";  // "LOCAL-DEMO-KEY-DO-NOT-USE-IN-CAR"
 
 struct Device {
     const char* id;
@@ -36,9 +37,13 @@ struct Device {
     size_t history_n = 0;
     uint32_t last_fix_ms = 0;
 
-    explicit Device(const char* device_id) : id(device_id), builder(device_id, "imu-v0") {
+    // boot_id must grow at every start; on the board it will be a counter kept in flash (NVS)
+    Device(const char* device_id, uint32_t boot_id) : id(device_id), builder(device_id, "imu-v0", boot_id) {
         uint8_t seed[32];
-        icvsp::from_hex(kDemoSeedHex, seed, 32);
+        if (!icvsp::from_hex(kDemoSeedHex, seed, 32)) {  // never sign with an uninitialised key
+            std::fprintf(stderr, "bad device key\n");
+            std::abort();
+        }
         icvsp::keypair_from_seed(seed, sk, pk);
     }
 
@@ -83,12 +88,12 @@ struct Device {
         const size_t n = fusion.poll(now_ms, ready, 4, flush);
         for (size_t i = 0; i < n; ++i) {
             const icvsp::FusedHazard& f = ready[i];
-            const icvsp::Detection d{f.type, f.t_ms, 0, 0, f.severity, f.confidence};
+            const icvsp::Detection d{f.type, f.t_ms, f.imu_peak, 0, f.severity, f.confidence};
             const char* model = f.sensors == (icvsp::kSensorImu | icvsp::kSensorCamera) ? "imu+cam-v0"
                                 : f.sensors == icvsp::kSensorImu                         ? "imu-v0"
                                                                                          : "cam-v0";
             const icvsp::GnssFix& fix = fix_at(f.t_ms);
-            char event[512], msg_id[48];
+            char event[640], msg_id[64];
             if (!builder.build(d, fix, event, sizeof event, msg_id, sizeof msg_id, model)) continue;
             uint8_t sig[64];
             const icvsp::MessageHeader h{id, msg_id, fix.utc_ms};
@@ -122,7 +127,7 @@ int main() {
     drive.events = {{Feature::SpeedBump, 6.0f, 4.0f}, {Feature::Braking, 12.0f, 3.0f},
                     {Feature::Pothole, 20.0f, 9.0f}};
     icvsp::sim::FakeGnss gnss;
-    Device dev("demo-car-01");
+    Device dev("demo-car-01", 1);
     for (const icvsp::ImuSample& s : drive.imu()) {
         const float t = s.t_ms / 1000.0f;
         const icvsp::GnssFix fix = gnss.at(t, drive.speed_at(t));

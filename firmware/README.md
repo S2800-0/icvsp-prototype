@@ -8,7 +8,7 @@ tested on a laptop before we have a board. Built with [PlatformIO](https://platf
 | `lib/icvsp_core/src/bump_detector` | Detects potholes and speed bumps from the vertical acceleration | FR-27 (proposed) |
 | `lib/icvsp_core/src/hazard_tracker` | Camera decision logic: confidence, road region, tracking, 3-of-5 frames, motion check for speed bumps (forward or rear camera) | FR-01 |
 | `lib/icvsp_core/src/fusion` | Combines IMU and camera into one report per hazard; the IMU decides the type when they disagree | FR-27 (proposed) |
-| `lib/icvsp_core/src/event_builder` | Builds the safety event in the engine's format (`engine/schema`) | FR-01/FR-02 |
+| `lib/icvsp_core/src/event_builder` | Builds the safety event, message format v2 (`engine/schema`): event ID = device-boot-sequence, `gps_valid` with null position when there is no fix, IMU jolt in g | FR-01/FR-02 |
 | `lib/icvsp_core/src/signer` | Ed25519 signature over sender, message ID, time and event | NFR-10 (proposed) |
 | `lib/icvsp_core/src/replay_guard` | Rejects stale (> 30 s), future-dated and repeated messages | FR-06 |
 | `lib/icvsp_sim` | Simulated IMU and GNSS: a car driving over chosen hazards | – |
@@ -21,7 +21,7 @@ tested on a laptop before we have a board. Built with [PlatformIO](https://platf
 ```bash
 pip install platformio cryptography
 cd firmware
-pio test -e native                         # unit tests (49)
+pio test -e native                         # unit tests (52)
 pio run -e native && .pio/build/native/program   # demo drive: prints signed reports as JSON
 python tools/check_with_engine.py          # builds the demo, then checks its reports from the backend side
 ```

@@ -13,7 +13,7 @@ cd engine
 python3 -m icvsp.demo                 # list scenarios
 python3 -m icvsp.demo sybil           # run one
 python3 -m icvsp.demo all             # run all seven
-python3 -m unittest -v                # 39 tests, including every scenario's expected outcome
+python3 -m unittest -v                # 46 tests, including every scenario's expected outcome
 ```
 
 Export a scenario to trace files and run the engine on the files only:
@@ -38,6 +38,11 @@ python3 -m icvsp.demo --from out/sybil
 ## How a decision is made
 
 1. **Schema check** (`validation.schema_errors`, mirrors `schema/safety_event.schema.json`).
+   Message format version 2 (13 Oct 2026) merges the device format with the mobile design: `device_id`,
+   `boot_id` + `sequence` (event IDs never repeat after a reboot), `detected_at`, `gps_valid` (no fix → null
+   position, kept for the log only), `latitude` / `longitude` / `position_accuracy_m`, `heading_deg`,
+   `detection_confidence`, optional `imu_peak_g`. A repeated (device, boot, sequence) is rejected like a
+   repeated `event_id`. The device signs the exact bytes, so the phone must forward them unchanged.
 2. **Plausibility** (`validation.plausibility`): future/stale timestamps, GPS accuracy,
    impossible speed, report location vs the sender's own beacons, trace jumps.
    Each check rejects the event or lowers its consistency *g*. *(Data-centric
@@ -86,7 +91,7 @@ icvsp/baselines.py    B1 naive forwarding, B2 majority vote
 icvsp/experiment.py   Stage 2 runner (metrics, confidence intervals, summary)
 icvsp/plot.py         Stage 2 charts
 results/              Stage 2 output (CSV, summary.md, charts)
-tests/                39 tests
+tests/                46 tests
 ```
 
 ## Trace format (the SUMO swap point)

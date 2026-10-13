@@ -19,11 +19,11 @@ void Fusion::push(const Pending& p) {
 }
 
 void Fusion::add_imu(const Detection& d) {
-    push(Pending{true, kSensorImu, d.t_ms, d.type, d.confidence, d.severity});
+    push(Pending{true, kSensorImu, d.t_ms, d.type, d.confidence, d.severity, d.peak});
 }
 
 void Fusion::add_camera(const CameraHazard& c) {
-    push(Pending{true, kSensorCamera, c.t_ms, c.type, c.conf, Severity::Low});
+    push(Pending{true, kSensorCamera, c.t_ms, c.type, c.conf, Severity::Low, 0.0f});
 }
 
 size_t Fusion::poll(uint32_t now_ms, FusedHazard* out, size_t cap, bool flush) {
@@ -42,7 +42,7 @@ size_t Fusion::poll(uint32_t now_ms, FusedHazard* out, size_t cap, bool flush) {
             }
             if (best) {
                 out[n++] = FusedHazard{a.type, a.t_ms, 1.0f - (1.0f - a.conf) * (1.0f - best->conf), a.severity,
-                                       static_cast<uint8_t>(kSensorImu | kSensorCamera)};
+                                       static_cast<uint8_t>(kSensorImu | kSensorCamera), a.peak};
                 a.used = best->used = false;
                 continue;
             }
@@ -57,7 +57,7 @@ size_t Fusion::poll(uint32_t now_ms, FusedHazard* out, size_t cap, bool flush) {
         else
             expired = cfg_.rear_camera ? true : now_ms - a.t_ms > wait;  // rear camera came last
         if (!expired && !flush) continue;
-        out[n++] = FusedHazard{a.type, a.t_ms, a.conf, a.severity, a.sensor};
+        out[n++] = FusedHazard{a.type, a.t_ms, a.conf, a.severity, a.sensor, a.peak};
         a.used = false;
     }
     return n;

@@ -90,19 +90,21 @@ def run(scn: Scenario, seed: int = 7) -> SimOutput:
     events: list[SafetyEvent] = []
     histories: dict[str, tuple[float, float]] = {}
     counter = [0]
+    seq: dict[str, int] = {}
 
     def noisy(lat: float, lon: float, sigma: float) -> tuple[float, float]:
         return offset(lat, lon, rng.gauss(0, sigma), rng.gauss(0, sigma))
 
     def emit(vid: str, v: VehicleSpec, t: float, s_report: float) -> None:
         counter[0] += 1
+        seq[vid] = seq.get(vid, 0) + 1
         across = LANE_M * v.direction
         lat, lon = noisy(*seg.point(s_report, across), v.acc_m / 2)
         events.append(SafetyEvent(
             event_id=f"evt_{counter[0]:04d}_{vid}", type="pothole", t=BASE_T + t, lat=lat, lon=lon,
             acc_m=v.acc_m, road_segment=seg.id, speed_kmh=round(v.speed_mps * 3.6, 1),
             heading_deg=_heading(seg, v.direction), severity="high", confidence=v.confidence,
-            source=vid, model="pothole-det v0.x"))
+            source=vid, model="pothole-det v0.x", boot_id=1, sequence=seq[vid]))
 
     for v in scn.vehicles:
         ids = [v.vid] if v.role != "sybil" else [f"{v.vid}{k + 1}" for k in range(v.clones + 1)]
