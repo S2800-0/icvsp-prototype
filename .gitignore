@@ -39,3 +39,6 @@ firmware/.pio/
 ai/models/*.espdl
 ai/models/*_esp32s3.info
 ai/models/*_esp32s3.json
+
+# backend database files (local runs)
+*.sqlite3

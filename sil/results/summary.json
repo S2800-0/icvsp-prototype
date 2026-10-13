@@ -1,0 +1,98 @@
+[
+ {
+  "scenario": "new_devices",
+  "title": "All devices new (no history)",
+  "cars": 40,
+  "minutes": 30.0,
+  "reports": {
+   "accepted": 90,
+   "duplicate": 4,
+   "rejected": {},
+   "lost": 1
+  },
+  "queries_real": 120,
+  "queries_fake": 0,
+  "warned_real": 0.6083333333333333,
+  "advisory_real": 0.09166666666666666,
+  "warned_real_after_10min": 0.7701149425287356,
+  "warned_fake": NaN,
+  "advisory_fake": NaN,
+  "queries_with_false_warning": 0.0,
+  "device_delay_median_s": 2.990931676709806,
+  "device_delay_p95_s": 3.060320372706883,
+  "reliability_honest_mean": 0.44290626040626047
+ },
+ {
+  "scenario": "fleet",
+  "title": "30 % vetted fleet devices",
+  "cars": 40,
+  "minutes": 30.0,
+  "reports": {
+   "accepted": 90,
+   "duplicate": 7,
+   "rejected": {},
+   "lost": 1
+  },
+  "queries_real": 120,
+  "queries_fake": 0,
+  "warned_real": 0.6333333333333333,
+  "advisory_real": 0.075,
+  "warned_real_after_10min": 0.8045977011494253,
+  "warned_fake": NaN,
+  "advisory_fake": NaN,
+  "queries_with_false_warning": 0.0,
+  "device_delay_median_s": 2.990931676709806,
+  "device_delay_p95_s": 3.060320372706883,
+  "reliability_honest_mean": 0.4935119449264186
+ },
+ {
+  "scenario": "faults",
+  "title": "Fleet + faults: 20 % BLE loss, 10 min internet outage, GPS loss on 20 % of cars",
+  "cars": 40,
+  "minutes": 30.0,
+  "reports": {
+   "accepted": 78,
+   "duplicate": 5,
+   "rejected": {},
+   "lost": 13
+  },
+  "queries_real": 120,
+  "queries_fake": 0,
+  "warned_real": 0.475,
+  "advisory_real": 0.14166666666666666,
+  "warned_real_after_10min": 0.5977011494252874,
+  "warned_fake": NaN,
+  "advisory_fake": NaN,
+  "queries_with_false_warning": 0.0,
+  "device_delay_median_s": 2.990931676709806,
+  "device_delay_p95_s": 3.060320372706883,
+  "reliability_honest_mean": 0.44703680456969935
+ },
+ {
+  "scenario": "attacks",
+  "title": "Fleet + attacks: fake reporter, 5 Sybil identities, replay, tampering, unregistered and revoked devices",
+  "cars": 40,
+  "minutes": 30.0,
+  "reports": {
+   "accepted": 95,
+   "duplicate": 9,
+   "rejected": {
+    "unknown device": 1,
+    "signature does not verify with the registered key": 1,
+    "device revoked": 1
+   },
+   "lost": 1
+  },
+  "queries_real": 120,
+  "queries_fake": 34,
+  "warned_real": 0.5083333333333333,
+  "advisory_real": 0.10833333333333334,
+  "warned_real_after_10min": 0.6666666666666666,
+  "warned_fake": 0.0,
+  "advisory_fake": 0.029411764705882353,
+  "queries_with_false_warning": 0.0,
+  "device_delay_median_s": 2.990931676709806,
+  "device_delay_p95_s": 3.060320372706883,
+  "reliability_honest_mean": 0.47914786537851556
+ }
+]

@@ -7,11 +7,12 @@ list in requirements.csv, and
   3. fails if a test names a requirement ID that is not in requirements.csv,
   4. writes a report: every requirement with its tests and an overall result.
 
-    cd engine && python3 -m unittest -v 2> ../engine.log
-    cd firmware && pio test -e native -v > ../firmware.log
-    cd firmware && python3 tools/check_with_engine.py > ../integration.log
-    python3 verification/check_traceability.py --engine-log engine.log --firmware-log firmware.log \
-        --integration-log integration.log --out traceability_report.md
+    (cd engine && python3 -m unittest -v 2> ../engine.log)
+    (cd backend && python3 -m unittest -v 2> ../backend.log)
+    python3 -m unittest sil/test_sil.py -v 2> sil.log
+    (cd firmware && pio test -e native -v > ../firmware.log && python3 tools/check_with_engine.py > ../integration.log)
+    python3 verification/check_traceability.py --unittest-log engine=engine.log --unittest-log backend=backend.log \
+        --unittest-log sil=sil.log --firmware-log firmware.log --integration-log integration.log
 
 Experiments (E-) are long or need private data, and inspections (I-) are done by a person, so they are not
 rerun here; the report shows them as "recorded".
@@ -30,7 +31,9 @@ HERE = Path(__file__).resolve().parent
 def code_tests() -> set[tuple[str, str]]:
     """(file, test) pairs that exist in the code."""
     found = set()
-    for f in sorted((ROOT / 'engine/tests').glob('test_*.py')):
+    py = [*(ROOT / 'engine/tests').glob('test_*.py'), *(ROOT / 'backend/tests').glob('test_*.py'),
+          *(ROOT / 'sil').glob('test_*.py')]
+    for f in sorted(py):
         cls = None
         for line in f.read_text().splitlines():
             if m := re.match(r'class (\w+)', line):
@@ -43,12 +46,19 @@ def code_tests() -> set[tuple[str, str]]:
     return found
 
 
-def results(engine_log: str, firmware_log: str, integration_log: str | None) -> dict[tuple[str, str], str]:
+def results(unittest_logs: dict[str, str], firmware_log: str, integration_log: str | None) -> dict[tuple[str, str], str]:
     res = {}
-    # "test_x (tests.module.Class.test_x) ... ok"; a test with a docstring prints the docstring on a second line
-    for m in re.finditer(r'^(test_\w+) \(tests\.(test_\w+)\.(\w+)\.\w+\)(?:\n[^\n]*?)? \.\.\. (\w+)', engine_log, re.M):
-        name, module, cls, outcome = m.groups()
-        res[(f'engine/tests/{module}.py', f'{cls}.{name}')] = 'Pass' if outcome == 'ok' else 'Fail'
+    # "test_x (tests.module.Class.test_x) ... ok"; a test with a docstring prints the docstring on a second line.
+    # Each log comes with the folder its tests were run from (engine, backend) or live in (sil).
+    for base, log in unittest_logs.items():
+        # a warning printed by the code under test can split "... ok" over several lines
+        for m in re.finditer(r'^(test_\w+) \(([\w.]+)\.(\w+)\.\w+\)(?:\n[^\n]*?)? \.\.\. '
+                             r'(?:[^\n]*\n){0,6}?[^\n]*?\b(ok|FAIL|ERROR|skipped)\b', log, re.M):
+            name, module, cls, outcome = m.groups()
+            parts = module.split('.')
+            if parts[0] == base:
+                parts = parts[1:]
+            res[(f'{base}/{"/".join(parts)}.py', f'{cls}.{name}')] = 'Pass' if outcome == 'ok' else 'Fail'
     for m in re.finditer(r'^test/(\w+)/test_main\.cpp:\d+:(\w+):(PASS|FAIL|IGNORE)', firmware_log, re.M):
         suite, name, outcome = m.groups()
         res[(f'firmware/test/{suite}/test_main.cpp', name)] = 'Pass' if outcome == 'PASS' else 'Fail'
@@ -62,7 +72,8 @@ def results(engine_log: str, firmware_log: str, integration_log: str | None) -> 
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument('--engine-log', required=True)
+    ap.add_argument('--unittest-log', action='append', required=True, metavar='FOLDER=LOG',
+                    help='Python unittest -v output, e.g. engine=engine.log (repeat for each suite)')
     ap.add_argument('--firmware-log', required=True)
     ap.add_argument('--integration-log')
     ap.add_argument('--out', default='traceability_report.md')
@@ -70,12 +81,13 @@ def main() -> int:
 
     reqs = {r['id']: r for r in csv.DictReader(open(HERE / 'requirements.csv'))}
     items = list(csv.DictReader(open(HERE / 'traceability.csv')))
-    res = results(Path(a.engine_log).read_text(), Path(a.firmware_log).read_text(),
+    logs = {k: Path(v).read_text() for k, v in (x.split('=', 1) for x in a.unittest_log)}
+    res = results(logs, Path(a.firmware_log).read_text(),
                   Path(a.integration_log).read_text() if a.integration_log else None)
     errors = []
 
     kind = lambda i: i['test_id'].split('-')[0]
-    listed = {(i['file'], i['test']) for i in items if kind(i) in ('T', 'F')}
+    listed = {(i['file'], i['test']) for i in items if kind(i) in ('T', 'F', 'B', 'S')}
     existing = code_tests()
     for f, t in sorted(existing - listed):
         errors.append(f'test not in traceability.csv: {f} {t}')
@@ -85,7 +97,7 @@ def main() -> int:
     by_req = defaultdict(list)
     for i in items:
         k = kind(i)
-        if k in ('T', 'F'):
+        if k in ('T', 'F', 'B', 'S'):
             i['result'] = res.get((i['file'], i['test']), 'Not run')
         elif k == 'IT':
             i['result'] = res.get((i['file'], '*'), 'Not run')
@@ -117,7 +129,7 @@ def main() -> int:
         ids = ', '.join(t['test_id'] for t in by_req.get(rid, []))
         rows.append(f"| {rid} | {r['priority']} | {v} | {ids} |")
 
-    n_auto = sum(1 for i in items if kind(i) in ('T', 'F', 'IT'))
+    n_auto = sum(1 for i in items if kind(i) in ('T', 'F', 'B', 'S', 'IT'))
     n_pass = sum(1 for i in items if i['result'] == 'Pass')
     lines = ['# ICVSP traceability report', '',
              f'{n_pass} of {n_auto} automated verification items pass; '

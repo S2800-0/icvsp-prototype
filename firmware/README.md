@@ -9,6 +9,8 @@ tested on a laptop before we have a board. Built with [PlatformIO](https://platf
 | `lib/icvsp_core/src/hazard_tracker` | Camera decision logic: confidence, road region, tracking, 3-of-5 frames, motion check for speed bumps (forward or rear camera) | FR-01 |
 | `lib/icvsp_core/src/fusion` | Combines IMU and camera into one report per hazard; the IMU decides the type when they disagree | FR-27 (proposed) |
 | `lib/icvsp_core/src/event_builder` | Builds the safety event, message format v2 (`engine/schema`): event ID = device-boot-sequence, `gps_valid` with null position when there is no fix, IMU jolt in g | FR-01/FR-02 |
+| `lib/icvsp_core/src/device` | The whole device pipeline (detectors → fusion → event → signature) in one class, used by the demo, the system simulation and later the board | — |
+| `tools/sil_vehicle.cpp` | One simulated vehicle for the system simulation (`sil/`) | — |
 | `lib/icvsp_core/src/signer` | Ed25519 signature over sender, message ID, time and event | NFR-10 (proposed) |
 | `lib/icvsp_core/src/replay_guard` | Rejects stale (> 30 s), future-dated and repeated messages | FR-06 |
 | `lib/icvsp_sim` | Simulated IMU and GNSS: a car driving over chosen hazards | – |

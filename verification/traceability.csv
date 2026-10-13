@@ -108,3 +108,27 @@ I-01,Inspection,engine/ (python3 -m icvsp.demo all),Decision log lists the reaso
 I-02,Inspection,engine/icvsp/config.py,Type-specific settings; second type (speed_bump) added without consensus changes,NFR-11
 I-03,Inspection,"engine/tests, firmware/test",Test suite runtime and coverage of testable Must requirements,NFR-14
 I-04,Inspection,engine/results,"Results folder holds config, seed, raw counts and summary",NFR-12
+B-01,Integration,backend/tests/test_api.py,Reports.test_golden_device_report_is_accepted,FR-02 FR-SEC-05 FR-SEC-07
+B-02,Integration,backend/tests/test_api.py,Reports.test_unknown_device_is_rejected,FR-SEC-03
+B-03,Integration,backend/tests/test_api.py,Reports.test_revoked_device_is_rejected,FR-SEC-12
+B-04,Integration,backend/tests/test_api.py,Reports.test_tampered_report_fails_the_signature,NFR-10 FR-SEC-07
+B-05,Integration,backend/tests/test_api.py,Reports.test_key_in_the_message_is_not_trusted,FR-SEC-03 FR-SEC-07
+B-06,Integration,backend/tests/test_api.py,Reports.test_retry_of_the_same_report_is_idempotent,FR-06 FR-SEC-10
+B-07,Integration,backend/tests/test_api.py,Reports.test_repeated_boot_and_sequence_is_rejected,FR-06 FR-SEC-09 FR-SEC-10
+B-08,Integration,backend/tests/test_api.py,Reports.test_reused_event_id_with_other_content_is_a_conflict,FR-06 FR-SEC-10
+B-09,Integration,backend/tests/test_api.py,Reports.test_malformed_body_is_rejected,FR-04 FR-SEC-13
+B-10,Integration,backend/tests/test_api.py,Reports.test_oversized_body_is_rejected,FR-04 FR-SEC-13
+B-11,Integration,backend/tests/test_api.py,Reports.test_signed_but_invalid_event_is_rejected_by_schema,FR-04 FR-SEC-13
+B-12,Integration,backend/tests/test_api.py,Reports.test_envelope_and_event_must_name_the_same_device,FR-SEC-07
+B-13,Integration,backend/tests/test_api.py,Reports.test_every_rejection_is_logged_with_a_reason,FR-14 FR-SEC-21
+B-14,Integration,backend/tests/test_api.py,Devices.test_registration_needs_the_admin_token,FR-SEC-04
+B-15,Integration,backend/tests/test_api.py,Devices.test_bad_key_and_double_registration_are_refused,FR-SEC-03 FR-SEC-04
+B-16,Integration,backend/tests/test_api.py,Hazards.test_two_vetted_cars_give_a_warning_ahead_only,FR-15 FR-16
+B-17,Integration,backend/tests/test_api.py,Hazards.test_two_new_cars_give_only_an_advisory,FR-12 FR-16
+B-18,Integration,backend/tests/test_api.py,Hazards.test_settle_rewards_confirmed_reports_once,FR-08
+S-01,System,sil/test_sil.py,WholeChain.test_real_hazards_produce_warnings_for_following_cars,FR-15 FR-16
+S-02,System,sil/test_sil.py,WholeChain.test_invented_hazards_never_reach_warning_level,NFR-03 NFR-05 FR-11
+S-03,System,sil/test_sil.py,WholeChain.test_tampered_unknown_and_revoked_reports_are_refused,FR-SEC-03 FR-SEC-07 FR-SEC-12
+S-04,System,sil/test_sil.py,WholeChain.test_replayed_report_has_no_effect,FR-06 FR-SEC-10
+S-05,System,sil/test_sil.py,WholeChain.test_device_emits_within_the_fusion_window,(supporting)
+E-07,System,sil/run_sil.py,"Whole-chain simulation, 40 cars, 4 scenarios (new devices, fleet, faults, attacks)",FR-15 FR-16 FR-18 NFR-03 NFR-05
