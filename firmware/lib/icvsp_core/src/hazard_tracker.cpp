@@ -68,6 +68,7 @@ size_t HazardTracker::update(uint32_t t_ms, float speed_kmh, const CamDetection*
         int best = -1;
         for (size_t i = 0; i < m; ++i)
             if (!done[i] && (best < 0 || dets[i].conf > dets[best].conf)) best = static_cast<int>(i);
+        if (best < 0) break;  // cannot happen (k < m), kept so the index is provably in range
         done[best] = true;
         const CamDetection& d = dets[best];
         if (d.conf < cfg_.min_conf) continue;

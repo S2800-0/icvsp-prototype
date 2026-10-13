@@ -30,7 +30,7 @@ struct BumpConfig {
 
 class BumpDetector {
 public:
-    explicit BumpDetector(BumpConfig cfg = {}) : cfg_(cfg) {}
+    explicit BumpDetector(const BumpConfig& cfg = {}) : cfg_(cfg) {}
 
     // Feed one sample. Returns true and fills `out` when a hazard has just ended.
     bool update(const ImuSample& s, float speed_kmh, Detection& out);

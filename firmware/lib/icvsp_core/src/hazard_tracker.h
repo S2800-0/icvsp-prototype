@@ -60,7 +60,7 @@ public:
     static constexpr size_t kMaxTracks = 16;
     static constexpr size_t kMaxPoints = 32;
 
-    explicit HazardTracker(TrackerConfig cfg = {}) : cfg_(cfg) {}
+    explicit HazardTracker(const TrackerConfig& cfg = {}) : cfg_(cfg) {}
 
     // Feed one processed frame (also frames without detections). Writes up to `cap` newly confirmed
     // hazards to `out` and returns how many.
