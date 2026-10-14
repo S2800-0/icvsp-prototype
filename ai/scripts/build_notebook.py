@@ -211,6 +211,11 @@ EXTRA_PUBLIC = {'mitangshu11/indian-roads-dataset': 'pub_indian_roads',      # m
                 'aryashah2k/potholenet': 'pub_potholenet',                   # potholes at night, rain, evening (CC BY 4.0)
                 'surbhisaswatimohanty/bharatpothole': 'pub_bharatpothole'}   # dashcam potholes (CC BY-SA 4.0)
 EXTRA = EXPERIMENT.startswith('v4')"""),
+    ('md', '## 0. v4 only, once, in the editor: attach the public datasets\nKaggle attaches new datasets only in an **interactive** session. Run this cell once in the editor (the three datasets then appear under *Input* on the right), then *Save Version → Save & Run All*. In the saved run it only checks that they are attached.'),
+    ('code', """if EXPERIMENT.startswith('v4'):
+    import kagglehub
+    for ref in EXTRA_PUBLIC:
+        print(ref, '->', kagglehub.dataset_download(ref))"""),
     ('md', '## 1. GPU and project folder'),
     ('code', f'!nvidia-smi -L\n%mkdir -p {KW}/scripts {KW}/configs {KW}/runs\n%cd {KW}'),
     ('md', '## 2. Project scripts'),
@@ -258,7 +263,11 @@ if EXTRA:
                 subprocess.run(['pip', '-q', 'install', 'kagglehub'], check=True)
                 import kagglehub
             print('downloading', ref, '...')
-            d = pathlib.Path(kagglehub.dataset_download(ref))
+            try:
+                d = pathlib.Path(kagglehub.dataset_download(ref))
+            except Exception as e:   # Kaggle only attaches new datasets in an interactive session
+                raise SystemExit(f'{ref} is not attached. Open the notebook in the editor, run the cell '
+                                 '"Attach the public datasets" once (interactive), then Save Version again. ({e})')
         n_img = sum(1 for p in d.rglob('*') if p.suffix.lower() in ('.jpg', '.jpeg', '.png'))
         names = [str(p.relative_to(d)) for p in d.rglob('*') if p.name in ('data.yaml', 'classes.txt')][:3]
         print(f'{ref}: {n_img} images in {d}, class files: {names or "none (single-class override in classes.yaml)"}')
