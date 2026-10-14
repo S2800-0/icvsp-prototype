@@ -158,9 +158,8 @@ Everything in `/kaggle/working` (the trained model, metrics, plots and `icvsp_re
 Limits: about 30 GPU hours per week, 12 hours per run. v1 (0.825) and v2 (0.837) are done.
 v3 / v3b / v3c fine-tune v2 on Egyptian and night frames (about 3–4 h each; v3c is the current model).
 **Next run: `v4_public_extra`**: the v3c recipe and data plus three public Kaggle datasets (unmarked speed breakers,
-night and rain potholes, dashcam potholes), to measure what extra public data changes (about 6–8 h). Attach
-*Add Input → Datasets*: `indian-roads-dataset` (mitangshu11), `potholenet` (aryashah2k), `bharatpothole`
-(surbhisaswatimohanty), plus the private `icvsp-egypt-train`.
+night and rain potholes, dashcam potholes), to measure what extra public data changes (about 6–8 h). Attach the private
+`icvsp-egypt-train` as before; the three public datasets are downloaded by the notebook itself (Internet on).
 
 **v3 needs your labelled frames as a private Kaggle dataset** (never public: YouTube frames, faces, plates):
 1. kaggle.com → *Datasets → New Dataset*, name it **icvsp-egypt-train**, keep it **Private**.
@@ -207,9 +206,10 @@ import re
 IMGSZ = int(re.search(r'--imgsz (\\d+)', ARGS).group(1)) if '--imgsz' in ARGS else 640
 EGYPT = EXPERIMENT.startswith(('v3', 'v4', 'espdet'))   # runs that use the private Egyptian data
 # v4: public Kaggle datasets to attach (Add Input -> Datasets -> search the name) -> folder name in the merge
-EXTRA_PUBLIC = {'indian-roads-dataset': 'pub_indian_roads',   # mitangshu11: marked + unmarked speed breakers, potholes
-                'potholenet': 'pub_potholenet',               # aryashah2k: potholes at night, rain, evening (CC BY 4.0)
-                'bharatpothole': 'pub_bharatpothole'}         # surbhisaswatimohanty: dashcam potholes (CC BY-SA 4.0)
+# (if they are not attached, the notebook fetches them itself with kagglehub; Internet must be on)
+EXTRA_PUBLIC = {'mitangshu11/indian-roads-dataset': 'pub_indian_roads',      # marked + unmarked speed breakers, potholes
+                'aryashah2k/potholenet': 'pub_potholenet',                   # potholes at night, rain, evening (CC BY 4.0)
+                'surbhisaswatimohanty/bharatpothole': 'pub_bharatpothole'}   # dashcam potholes (CC BY-SA 4.0)
 EXTRA = EXPERIMENT.startswith('v4')"""),
     ('md', '## 1. GPU and project folder'),
     ('code', f'!nvidia-smi -L\n%mkdir -p {KW}/scripts {KW}/configs {KW}/runs\n%cd {KW}'),
@@ -218,7 +218,7 @@ EXTRA = EXPERIMENT.startswith('v4')"""),
     ('md', '## 3. Install packages'),
     ('code', f'!pip -q install -r {KW}/requirements.txt\nimport ultralytics; print("ultralytics", ultralytics.__version__, "installed")'),
     ('md', '## 3b. v3 / v4 / ESPDet only: check the Egyptian data, the public datasets (v4) and the starting files (fails in seconds, before the long download)'),
-    ('code', """import glob, pathlib, shutil, urllib.request
+    ('code', """import glob, pathlib, shutil, subprocess, urllib.request
 if EXPERIMENT.startswith('espdet'):
     !python scripts/espdet_support.py
 if EGYPT:
@@ -246,13 +246,22 @@ if EGYPT:
     assert not missing, f'Missing from icvsp-egypt-train: {missing}. Add them in a new dataset version, then run again.'
 if EXTRA:
     PUBLIC_DIRS = {}
-    for slug, folder in EXTRA_PUBLIC.items():
+    for ref, folder in EXTRA_PUBLIC.items():
+        slug = ref.split('/')[1]
         hits = [p for p in glob.glob(f'/kaggle/input/**/{slug}', recursive=True) if pathlib.Path(p).is_dir()]
-        assert hits, f'Attach the public dataset "{slug}": Add Input -> Datasets -> search "{slug}".'
-        d = pathlib.Path(hits[0])
+        if hits:
+            d = pathlib.Path(hits[0])
+        else:   # not attached: download it (public dataset, works inside Kaggle without a token)
+            try:
+                import kagglehub
+            except ImportError:
+                subprocess.run(['pip', '-q', 'install', 'kagglehub'], check=True)
+                import kagglehub
+            print('downloading', ref, '...')
+            d = pathlib.Path(kagglehub.dataset_download(ref))
         n_img = sum(1 for p in d.rglob('*') if p.suffix.lower() in ('.jpg', '.jpeg', '.png'))
         names = [str(p.relative_to(d)) for p in d.rglob('*') if p.name in ('data.yaml', 'classes.txt')][:3]
-        print(f'{slug}: {n_img} images, class files: {names or "none (single-class override in classes.yaml)"}')
+        print(f'{ref}: {n_img} images in {d}, class files: {names or "none (single-class override in classes.yaml)"}')
         PUBLIC_DIRS[folder] = d"""),
     ('md', '## 4. Download SBP-YOLO, add the Egyptian / night data, merge\nThe data goes to `/tmp` so it is not saved into the output. Class IDs were verified on 29 Sep (0 = pothole, 1 = speed bump). The download is retried automatically if Drive rate-limits it. For v3, the zips from the private `icvsp-egypt-train` dataset are unpacked next to SBP-YOLO; video frames are split by video, never by frame.'),
     ('code', """import subprocess
