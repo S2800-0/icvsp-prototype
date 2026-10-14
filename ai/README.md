@@ -160,10 +160,26 @@ fine-tunes v2 on Egyptian frames instead of merging more foreign datasets.
    its `detections.csv` in `tools/review.html` (*Video* tab) to see where the boxes really are; the same
    page records timestamps (**B** bump, **H** pothole, **D** dip while watching) and exports `events.csv`.
 
+## Step 6: extra public data (v4)
+
+`v4_public_extra` is v3c with three public Kaggle datasets added to training, to see what more public data
+changes: the **Indian Roads Dataset** (marked and unmarked speed breakers, potholes; capped at 3,000 images,
+speed-bump images first), **PotHoleNet** (potholes at night, in rain, evening; 1,500) and **BharatPothole**
+(dashcam potholes; 1,500). Attach them in the Kaggle notebook (*Add Input → Datasets*) with the private
+`icvsp-egypt-train`; the notebook links them into the merge without copying.
+
+The comparison stays fair: only SBP-YOLO keeps a test split, so the public test set is identical to v3c's, and
+any image in an added dataset that is an exact or near copy of a test image is removed (`merge_datasets.py`,
+checked on a synthetic case). Note: the merge also counts **615 SBP-YOLO train/val images that are near copies
+of SBP test images** (dHash distance ≤ 4). They are kept so the baseline stays the same, but they may make the
+public-test scores of every model look better than they are; the held-out Egyptian videos are the honest test.
+
 ## Licences
 
 - SBP-YOLO repository: GPL-3.0. Cite Liang et al., *J. Real-Time Image Processing* 23, 52 (2026).
 - RDD2022: CC BY 4.0. Mapillary images: CC BY-SA 4.0.
+- PotHoleNet: CC BY 4.0, cite Bučko et al., *Sensors* 22, 8878 (2022). BharatPothole: CC BY-SA 4.0.
+- Indian Roads Dataset (Kaggle, mitangshu11): no licence stated; used for training only, not redistributed.
 - Ultralytics YOLO: AGPL-3.0 (fine for the graduation project).
 - YouTube driving videos: used privately to test the approach, not redistributed; not part of any
   published dataset or paper figure. For the paper, the team's own recordings replace them.

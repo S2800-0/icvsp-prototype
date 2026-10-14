@@ -20,6 +20,21 @@ sources:
   sbp_yolo:
     names: [pothole, speed_bump]
 
+  # extra public datasets (Kaggle), added in v4. Single-class pothole sets; capped to keep training within
+  # Kaggle's 12-hour limit (images with speed bumps are kept first).
+  pub_indian_roads:
+    max_images: 3000
+  pub_potholenet:
+    names: [pothole]
+    max_images: 1500
+  pub_bharatpothole:
+    names: [pothole]
+    max_images: 1500
+
+# Only these sources keep their own test split; every other source goes to train/val, so the public test set
+# is identical for every experiment.
+test_sources: '^sbp_yolo$'
+
 # Sources made of video frames are split by video, never by frame (see merge_datasets.py).
 # background_* folders hold hazard-free images (e.g. night reflections) and need no labels.
 video_sources: '^(egypt|youtube|background)'

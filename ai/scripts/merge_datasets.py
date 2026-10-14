@@ -7,8 +7,14 @@ the script:
   3. removes near-duplicate images across all sources (perceptual dHash),
   4. writes data/merged/{train,val,test}/{images,labels} and data/merged/data.yaml.
 
-Splits: a source's own test split is kept as test, so results stay comparable with the
-source paper; everything else is re-split train/val 85/15 per source.
+Splits: only the sources named by `test_sources` in classes.yaml (SBP-YOLO) keep their own test split, so the
+public test set stays exactly the same when datasets are added; every other image is re-split train/val 85/15
+per source. Test images are hashed first, and any other image that is an exact or near copy of a test image
+(dHash Hamming distance <= 4) in an added dataset is removed, so no test image can leak into training through
+another dataset. (Near copies inside the test source's own train split are kept, so the baseline stays the same,
+and counted in the report.)
+`max_images` under a source in classes.yaml caps how many images it contributes (images with speed bumps,
+the scarcer class, are kept first).
 
 Video-derived sources (folder name matching `video_sources` in classes.yaml, e.g. egypt_*,
 youtube_*, background_*) are split by VIDEO, not by frame: neighbouring frames of one drive are
@@ -45,7 +51,7 @@ def source_names(src: Path):
     if src.name.lower().startswith('background'):
         return []
     override = (yaml.safe_load((ROOT / 'configs/classes.yaml').read_text()).get('sources') or {}).get(src.name)
-    if override:
+    if override and 'names' in override:
         return list(override['names'])
     for y in list(src.rglob('data.yaml')) + list(src.rglob('*.yaml')):
         try:
@@ -79,6 +85,10 @@ def dhash(path, size=8):
     bits = ''.join('1' if px[r * (size + 1) + c] > px[r * (size + 1) + c + 1] else '0'
                    for r in range(size) for c in range(size))
     return int(bits, 2)
+
+
+def near_test(h: int, test_hashes: list, max_dist: int = 4) -> bool:
+    return any((h ^ t).bit_count() <= max_dist for t in test_hashes)
 
 
 def video_of(img: Path):
@@ -125,14 +135,34 @@ def main():
         (args.out / s / 'images').mkdir(parents=True)
         (args.out / s / 'labels').mkdir(parents=True)
 
-    seen = {}
-    report = {'sources': {}, 'duplicates_removed': 0}
+    test_rx = re.compile(cfg.get('test_sources', '^sbp_yolo$'), re.I)
+    src_cfg = cfg.get('sources') or {}
+    sources = sorted(p for p in args.raw.iterdir() if p.is_dir())
+    images = {src: sorted(p for p in src.rglob('*') if p.suffix.lower() in IMG_EXT) for src in sources}
+
+    # pass 1: hash the test images first, so a copy in another dataset can never displace or leak them
+    seen, test_hashes = {}, []
+    for src in sources:
+        if not test_rx.search(src.name):
+            continue
+        for img in images[src]:
+            if split_of(img) == 'test':
+                try:
+                    h = dhash(img)
+                except Exception:
+                    continue
+                if h not in seen:
+                    seen[h] = img
+                    test_hashes.append(h)
+
+    report = {'sources': {}, 'duplicates_removed': 0, 'near_test_copies_removed': 0}
     counts = defaultdict(Counter)
 
-    for src in sorted(p for p in args.raw.iterdir() if p.is_dir()):
+    for src in sources:
         src_names = source_names(src)
         cmap = build_map(src_names, rules, exclude)
-        imgs = sorted(p for p in src.rglob('*') if p.suffix.lower() in IMG_EXT)
+        imgs = images[src]
+        keeps_test = bool(test_rx.search(src.name))
         rep = {'source_classes': src_names, 'mapping': {src_names[k]: names[v] for k, v in cmap.items()},
                'images': 0, 'kept': 0, 'dropped_boxes': 0}
         pending = []
@@ -142,9 +172,18 @@ def main():
                 h = dhash(img)
             except Exception:
                 continue
-            if h in seen:
+            is_test = keeps_test and split_of(img) == 'test'
+            if h in seen and seen[h] != img:
                 report['duplicates_removed'] += 1
                 continue
+            if not is_test and test_hashes and near_test(h, test_hashes):
+                if not keeps_test:   # a copy of a test image in an added dataset: never train on it
+                    report['near_test_copies_removed'] += 1
+                    continue
+                # inside the test source itself the split is the published one; kept so the baseline stays
+                # identical, but counted so the overlap is known
+                report.setdefault('near_test_within_test_source', 0)
+                report['near_test_within_test_source'] += 1
             seen[h] = img
             lab = label_for(img)
             lines = []
@@ -158,7 +197,16 @@ def main():
                         lines.append(' '.join([str(cmap[cid])] + f[1:5]))
                     else:
                         rep['dropped_boxes'] += 1
-            pending.append((img, lines, split_of(img)))
+            pending.append((img, lines, split_of(img) if keeps_test else 'train'))
+
+        cap = (src_cfg.get(src.name) or {}).get('max_images')
+        if cap and len(pending) > cap:
+            rnd = random.Random(f'{args.seed}-{src.name}')
+            rnd.shuffle(pending)
+            bump = names.index('speed_bump')
+            pending.sort(key=lambda x: not any(int(l.split()[0]) == bump for l in x[1]))  # stable: bumps first
+            rep['capped_from'] = len(pending)
+            pending = pending[:cap]
 
         # re-split non-test images 85/15 per source (per video for video-derived sources)
         rest = [x for x in pending if x[2] != 'test']
