@@ -55,7 +55,7 @@ class Service:
                 raise Rejected(422, "schema: " + "; ".join(errs))
             if ev["device_id"] != env.sender or ev["event_id"] != env.msg_id:
                 raise Rejected(422, "event device_id / event_id differ from the signed envelope")
-            line = raw.decode()
+            line = env.line
             old = self.store.report(ev["event_id"])
             if old is not None:
                 if old["line"] == line:   # a retry after a timeout: already stored, nothing to do

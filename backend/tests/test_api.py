@@ -115,6 +115,15 @@ class Reports(Base):
         self.assertEqual(r.json()["status"], "duplicate")
         self.assertEqual(len(self.store.reports_since(0)), 1)
 
+    def test_retry_with_a_different_line_ending_is_still_a_duplicate(self):
+        """Found by the live-server check: a phone that adds a newline on retry must not get a conflict."""
+        self.register("demo-car-01", DEMO_KEY)
+        self.assertEqual(self.post(GOLDEN[0].encode()).json()["status"], "accepted")
+        for variant in (GOLDEN[0] + "\n", GOLDEN[0] + "\r\n", "  " + GOLDEN[0]):
+            r = self.post(variant.encode())
+            self.assertEqual(r.status_code, 201, r.text)
+            self.assertEqual(r.json()["status"], "duplicate")
+
     def test_repeated_boot_and_sequence_is_rejected(self):
         car = Car("car-a")
         self.register("car-a", car.public_hex)

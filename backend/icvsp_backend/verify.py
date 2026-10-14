@@ -23,6 +23,7 @@ class Rejected(Exception):
 
 @dataclass
 class Envelope:
+    line: str             # the received line without surrounding whitespace
     event: dict
     payload: bytes        # the signed event bytes
     sender: str
@@ -39,7 +40,7 @@ def parse(raw: bytes) -> Envelope:
     if len(raw) > MAX_LINE:
         raise Rejected(413, "report too large")
     try:
-        line = raw.decode()
+        line = raw.decode().strip()   # line endings and spaces around the line are not part of the signed bytes
         d = json.loads(line)
         start, end = len(PREFIX), line.index(SUFFIX)
         if not line.startswith(PREFIX):
@@ -50,7 +51,7 @@ def parse(raw: bytes) -> Envelope:
         sig = bytes.fromhex(d["signature"])
         if len(sig) != 64 or not isinstance(d["utc_ms"], int):
             raise ValueError
-        return Envelope(d["event"], payload, str(d["sender"]), str(d["msg_id"]), d["utc_ms"], sig)
+        return Envelope(line, d["event"], payload, str(d["sender"]), str(d["msg_id"]), d["utc_ms"], sig)
     except (UnicodeDecodeError, ValueError, KeyError, TypeError):
         raise Rejected(400, "not a signed ICVSP report (forward the device's line unchanged)") from None
 

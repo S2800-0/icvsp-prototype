@@ -115,13 +115,13 @@ of cars each run the real device code, their phones upload to the backend throug
 cars are warned or not. Results with the assumptions stated: [`sil/results/summary.md`](sil/results/summary.md).
 
 ```bash
-cd backend && python3 -m unittest -v           # 18 API tests
+cd backend && python3 -m unittest -v           # 19 API tests
 python3 sil/run_sil.py                         # whole-chain simulation, 4 scenarios
 ```
 
 ### Verification
 
-Every push runs the V-cycle checks on GitHub Actions: 121 tests (52 device, 46 engine, 18 backend, 5 system
+Every push runs the V-cycle checks on GitHub Actions: 122 tests (52 device, 46 engine, 19 backend, 5 system
 simulation), the device → engine integration check, static analysis, and a traceability check that links every test to the
 requirement IDs of the team's V-cycle workbooks and fails if a test is unlisted or failing. The
 requirement → test → result report appears on each run's summary page. Details: [`verification/`](verification/).

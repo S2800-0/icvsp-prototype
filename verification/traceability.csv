@@ -126,6 +126,7 @@ B-15,Integration,backend/tests/test_api.py,Devices.test_bad_key_and_double_regis
 B-16,Integration,backend/tests/test_api.py,Hazards.test_two_vetted_cars_give_a_warning_ahead_only,FR-15 FR-16
 B-17,Integration,backend/tests/test_api.py,Hazards.test_two_new_cars_give_only_an_advisory,FR-12 FR-16
 B-18,Integration,backend/tests/test_api.py,Hazards.test_settle_rewards_confirmed_reports_once,FR-08
+B-19,Integration,backend/tests/test_api.py,Reports.test_retry_with_a_different_line_ending_is_still_a_duplicate,FR-06 FR-SEC-10
 S-01,System,sil/test_sil.py,WholeChain.test_real_hazards_produce_warnings_for_following_cars,FR-15 FR-16
 S-02,System,sil/test_sil.py,WholeChain.test_invented_hazards_never_reach_warning_level,NFR-03 NFR-05 FR-11
 S-03,System,sil/test_sil.py,WholeChain.test_tampered_unknown_and_revoked_reports_are_refused,FR-SEC-03 FR-SEC-07 FR-SEC-12
