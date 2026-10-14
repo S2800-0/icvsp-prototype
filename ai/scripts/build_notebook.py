@@ -214,10 +214,19 @@ EXTRA_PUBLIC = {'mitangshu11/indian-roads-dataset': 'pub_indian_roads',      # m
                 'surbhisaswatimohanty/bharatpothole': 'pub_bharatpothole'}   # dashcam potholes (CC BY-SA 4.0)
 EXTRA = EXPERIMENT.startswith('v4')"""),
     ('md', '## 0. v4 only, once, in the editor: attach the public datasets\nKaggle attaches new datasets only in an **interactive** session. Run this cell once in the editor (the public datasets then appear under *Input* on the right), then *Save Version → Save & Run All*. In the saved run it only checks that they are attached.'),
-    ('code', """if EXPERIMENT.startswith('v4'):
-    import kagglehub
+    ('code', """if EXPERIMENT.startswith('v4'):   # never stops the run: section 3b decides what is used
+    import glob, pathlib
     for ref in EXTRA_PUBLIC:
-        print(ref, '->', kagglehub.dataset_download(ref))"""),
+        slug = ref.split('/')[1]
+        hits = [p for p in glob.glob(f'/kaggle/input/**/{slug}', recursive=True) if pathlib.Path(p).is_dir()]
+        if hits:                       # attached already (the original or your own upload of the same name)
+            print(ref, 'attached at', hits[0])
+            continue
+        try:
+            import kagglehub
+            print(ref, '->', kagglehub.dataset_download(ref))
+        except Exception as e:         # e.g. a saved (non-interactive) run cannot attach new datasets
+            print(ref, 'not attached:', str(e)[:200])"""),
     ('md', '## 1. GPU and project folder'),
     ('code', f'!nvidia-smi -L\n%mkdir -p {KW}/scripts {KW}/configs {KW}/runs\n%cd {KW}'),
     ('md', '## 2. Project scripts'),
