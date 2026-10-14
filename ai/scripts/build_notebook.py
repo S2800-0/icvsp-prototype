@@ -207,9 +207,10 @@ IMGSZ = int(re.search(r'--imgsz (\\d+)', ARGS).group(1)) if '--imgsz' in ARGS el
 EGYPT = EXPERIMENT.startswith(('v3', 'v4', 'espdet'))   # runs that use the private Egyptian data
 # v4: public Kaggle datasets to attach (Add Input -> Datasets -> search the name) -> folder name in the merge
 # (if they are not attached, the notebook fetches them itself with kagglehub; Internet must be on)
-# mitangshu11/indian-roads-dataset (pub_indian_roads) was dropped: Kaggle failed to mount it (run of 14 Oct) and its
-# licence is not stated
-EXTRA_PUBLIC = {'aryashah2k/potholenet': 'pub_potholenet',                   # potholes at night, rain, evening (CC BY 4.0)
+# Indian Roads: Kaggle failed to mount the original (run of 14 Oct), so attach your own private re-upload named
+# indian-roads-dataset (found by that name wherever it is mounted). Licence not stated: training only, never shared.
+EXTRA_PUBLIC = {'mitangshu11/indian-roads-dataset': 'pub_indian_roads',      # marked + unmarked speed breakers, potholes
+                'aryashah2k/potholenet': 'pub_potholenet',                   # potholes at night, rain, evening (CC BY 4.0)
                 'surbhisaswatimohanty/bharatpothole': 'pub_bharatpothole'}   # dashcam potholes (CC BY-SA 4.0)
 EXTRA = EXPERIMENT.startswith('v4')"""),
     ('md', '## 0. v4 only, once, in the editor: attach the public datasets\nKaggle attaches new datasets only in an **interactive** session. Run this cell once in the editor (the public datasets then appear under *Input* on the right), then *Save Version → Save & Run All*. In the saved run it only checks that they are attached.'),
