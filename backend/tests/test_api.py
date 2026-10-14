@@ -237,5 +237,24 @@ class Hazards(Base):
         self.assertEqual(self.store.reputations()["car-a"][0], before[0] + 1.0)
 
 
+    def test_overview_shows_decisions_reliability_positions_and_rejections(self):
+        """The operator dashboard's data: every decision with its state and reasons, device reliability,
+        live positions and the rejection log; admin only."""
+        self.assertEqual(self.client.get("/admin/overview").status_code, 401)
+        self.two_reports(vetted=True)
+        self.post(GOLDEN[0].encode())                       # unknown device, logged
+        ov = self.client.get("/admin/overview", headers=ADMIN).json()
+        self.assertEqual(ov["counts"], {"devices": 2, "reports": 2, "rejections": 1})
+        self.assertEqual({d["device_id"]: d["reliability"] for d in ov["devices"]}, {"car-a": 0.571, "car-b": 0.571})
+        hz = ov["hazards"]
+        self.assertEqual(len(hz), 1)
+        self.assertEqual(hz[0]["state"], "corroborated")
+        self.assertEqual(hz[0]["support"], ["car-a", "car-b"])
+        self.assertTrue(hz[0]["reasons"])
+        self.assertEqual(ov["rejections"][0]["reason"], "unknown device")
+        self.assertEqual({v["vehicle_id"] for v in ov["vehicles"]}, {"car-a", "car-b"})
+        self.assertEqual(self.client.get("/dashboard").status_code, 200)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -25,3 +25,17 @@ behaviour. The results show how the system logic behaves under those assumptions
 Replacing the assumptions with measured values (phone recordings now, the board later) is the next step.
 
 Results: [`results/summary.md`](results/summary.md).
+
+## Live demo with the dashboard
+
+```bash
+python3 sil/live_demo.py                       # attacks scenario, 30 cars, 10x speed; opens the dashboard
+python3 sil/live_demo.py --scenario faults --speed 20 --cars 40
+```
+
+The same scenario, played in sped-up real time against the **real backend over HTTP** (uvicorn on
+127.0.0.1, in memory, nothing saved). The backend's operator dashboard opens in the browser and shows the
+road, the cars, the true hazards next to the trust engine's decisions (advisory / warning / suppressed, with
+its reasons), device reliability, and every report, rejection and warning check as it happens. Buttons on the
+page launch extra attacks (replay, tampering, unregistered device, a new device inventing a pothole, a Sybil
+group) so the answer of the backend and the trust engine can be shown live.

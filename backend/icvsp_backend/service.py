@@ -144,3 +144,41 @@ class Service:
                 "net_evidence": round(d.net, 3), "reasons": d.reasons,
             })
         return sorted(out, key=lambda h: h["distance_m"])
+
+    # ---------- operator view ----------
+    def overview(self, now: float, recent: int = 30, position_window_s: float = 15.0) -> dict:
+        """Everything the operator dashboard shows: devices with their reliability, every current hazard
+        decision (including suppressed ones and why), live vehicle positions, latest reports and rejections."""
+        eng, _ = self._engine(now)
+        result = eng.decide(now)
+        rep = Reputation(self.cfg.prior_good, self.cfg.prior_bad)
+        devices = []
+        for d in self.store.devices():
+            rep.seed(d["device_id"], d["good"], d["bad"])
+            devices.append({"device_id": d["device_id"], "status": d["status"], "good": d["good"], "bad": d["bad"],
+                            "reliability": round(rep.score(d["device_id"]), 3)})
+        hazards = [{
+            "hazard_id": d.hazard_id, "type": d.type, "state": d.state.value, "action": d.action,
+            "latitude": round(d.lat, 6), "longitude": round(d.lon, 6), "heading_deg": round(d.heading_deg, 1),
+            "independent_sources": d.independent_sources, "net_evidence": round(d.net, 3),
+            "support": sorted({e.source for e in d.support}), "contra": len({e.source for e in d.contra}),
+            "sybil_suspected": d.sybil_suspected, "reasons": d.reasons,
+        } for d in result.decisions]
+        reports = []
+        for r in self.store.recent_reports(recent):
+            ev = json.loads(r["line"])["event"]
+            reports.append({"event_id": r["event_id"], "device_id": r["device_id"], "type": ev["type"],
+                            "latitude": ev["latitude"], "longitude": ev["longitude"],
+                            "detection_confidence": ev["detection_confidence"], "detected_at": r["detected_at"],
+                            "received_at": r["received_at"], "settled": bool(r["settled"])})
+        return {
+            "now": now,
+            "counts": {k: self.store.count(k) for k in ("devices", "reports", "rejections")},
+            "devices": devices, "hazards": hazards, "reports": reports,
+            "rejections": [dict(r) for r in self.store.rejections(recent)][::-1],
+            "engine_rejected": [{"event_id": x.event_id, "device_id": x.source, "reasons": x.reasons}
+                                for x in result.rejected[-recent:]],
+            "vehicles": [{"vehicle_id": b["vehicle_id"], "t": b["t"], "lat": b["lat"], "lon": b["lon"],
+                          "heading_deg": b["heading_deg"], "speed_mps": b["speed_mps"]}
+                         for b in self.store.latest_positions(now - position_window_s, now)],
+        }

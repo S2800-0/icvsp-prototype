@@ -9,14 +9,18 @@ from __future__ import annotations
 import hmac
 import os
 import time
+from pathlib import Path
 from typing import Callable
 
 from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from .service import Service
 from .store import Store
 from .verify import Rejected
+
+DASHBOARD = Path(__file__).with_name("dashboard.html")
 
 
 class DeviceIn(BaseModel):
@@ -84,6 +88,16 @@ def create_app(store: Store | None = None, clock: Callable[[], float] = time.tim
     @app.get("/hazards")
     def hazards(lat: float, lon: float, radius_m: float = 1000.0, heading_deg: float | None = None):
         return svc.hazards(clock(), lat, lon, radius_m, heading_deg)
+
+    @app.get("/admin/overview")
+    def overview(recent: int = 30, x_admin_token: str | None = Header(default=None)):
+        """Operator view used by the dashboard (/dashboard)."""
+        admin(x_admin_token)
+        return svc.overview(clock(), max(1, min(recent, 200)))
+
+    @app.get("/dashboard", response_class=HTMLResponse, include_in_schema=False)
+    def dashboard():
+        return DASHBOARD.read_text()
 
     @app.post("/admin/settle")
     def settle(x_admin_token: str | None = Header(default=None)):

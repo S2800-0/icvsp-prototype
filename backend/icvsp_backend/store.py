@@ -74,6 +74,9 @@ class Store:
     def reputations(self) -> dict[str, tuple[float, float]]:
         return {r["device_id"]: (r["good"], r["bad"]) for r in self._x("SELECT device_id, good, bad FROM devices")}
 
+    def devices(self) -> list[sqlite3.Row]:
+        return self._x("SELECT device_id, status, good, bad, registered FROM devices ORDER BY device_id").fetchall()
+
     def add_reputation(self, device_id: str, good: float, bad: float) -> None:
         self._x("UPDATE devices SET good = good + ?, bad = bad + ? WHERE device_id = ?", (good, bad, device_id))
 
@@ -96,8 +99,17 @@ class Store:
     def reject(self, now: float, device_id: str | None, event_id: str | None, reason: str) -> None:
         self._x("INSERT INTO rejections VALUES (?, ?, ?, ?)", (now, device_id, event_id, reason))
 
-    def rejections(self) -> list[sqlite3.Row]:
-        return self._x("SELECT * FROM rejections ORDER BY received_at").fetchall()
+    def rejections(self, limit: int = -1) -> list[sqlite3.Row]:
+        """Oldest first; with a limit, only the latest `limit` rows."""
+        rows = self._x("SELECT * FROM rejections ORDER BY received_at DESC LIMIT ?", (limit,)).fetchall()
+        return rows[::-1]
+
+    def recent_reports(self, limit: int) -> list[sqlite3.Row]:
+        return self._x("SELECT * FROM reports ORDER BY received_at DESC LIMIT ?", (limit,)).fetchall()
+
+    def count(self, table: str) -> int:
+        assert table in ("devices", "reports", "rejections", "beacons")
+        return self._x(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
 
     # beacons
     def add_beacons(self, rows: list[tuple]) -> None:
@@ -107,6 +119,12 @@ class Store:
 
     def beacons_since(self, t: float) -> list[sqlite3.Row]:
         return self._x("SELECT * FROM beacons WHERE t >= ? ORDER BY t", (t,)).fetchall()
+
+    def latest_positions(self, since: float, until: float) -> list[sqlite3.Row]:
+        """The newest beacon of every vehicle seen between `since` and `until`."""
+        return self._x("SELECT b.* FROM beacons b JOIN (SELECT vehicle_id, MAX(t) AS t FROM beacons "
+                       "WHERE t BETWEEN ? AND ? GROUP BY vehicle_id) m ON b.vehicle_id = m.vehicle_id AND b.t = m.t",
+                       (since, until)).fetchall()
 
     def pass_settled(self, vehicle_id: str, hazard_key: str) -> bool:
         cur = self._x("INSERT OR IGNORE INTO settled_passes VALUES (?, ?)", (vehicle_id, hazard_key))

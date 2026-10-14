@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ICVSP Operator Dashboard</title>
+<style>
+:root {
+  --bg: #f5f6f8; --panel: #ffffff; --ink: #1c2230; --muted: #667085; --line: #e3e6eb; --road: #c9ced6;
+  --accent: #2f6fde; --ok: #1f9d55; --warn: #d97706; --bad: #d92d20; --conf: #9b1c1c; --sup: #98a2b3;
+  --car: #2f6fde; --attacker: #c026d3;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11151c; --panel: #1a2029; --ink: #e6e9ef; --muted: #98a2b3; --line: #2a313c; --road: #3a4250;
+    --accent: #6b9cff; --ok: #3ccf7e; --warn: #f5a524; --bad: #ff5a4f; --conf: #ff8a80; --sup: #6b7280;
+    --car: #6b9cff; --attacker: #e879f9;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+header { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; padding: 14px 20px; background: var(--panel); border-bottom: 1px solid var(--line); }
+header h1 { font-size: 17px; margin: 0; }
+header .sub { color: var(--muted); font-size: 13px; }
+.grow { flex: 1; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 99px; font-size: 12px; background: var(--bg); border: 1px solid var(--line); }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--sup); }
+.dot.on { background: var(--ok); } .dot.off { background: var(--bad); }
+main { padding: 16px 20px 40px; display: grid; gap: 16px; max-width: 1400px; margin: 0 auto; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; min-width: 0; }
+.panel h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 10px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.card .v { font-size: 24px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.card .l { color: var(--muted); font-size: 12px; }
+.card.good .v { color: var(--ok); } .card.badv .v { color: var(--bad); }
+.two { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; }
+@media (max-width: 900px) { .two { grid-template-columns: 1fr; } }
+button, select, input { font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 7px; padding: 5px 10px; }
+button { cursor: pointer; } button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.attacks { display: flex; flex-wrap: wrap; gap: 8px; }
+.attacks button { border-color: color-mix(in srgb, var(--bad) 40%, var(--line)); }
+.progress { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; margin-top: 4px; width: 220px; }
+.progress div { height: 100%; background: var(--accent); width: 0; }
+svg { width: 100%; height: auto; display: block; }
+svg text { fill: var(--muted); font-size: 11px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); font-size: 12px; margin-top: 8px; }
+.legend span { display: inline-flex; align-items: center; gap: 5px; }
+.sw { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+.feed { max-height: 420px; overflow: auto; font-size: 13px; }
+.feed div { padding: 5px 2px; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: 58px 1fr; gap: 8px; }
+.feed .t { color: var(--muted); font-variant-numeric: tabular-nums; }
+.tag { font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 4px; margin-right: 4px; }
+.tag.ok { background: color-mix(in srgb, var(--ok) 15%, transparent); color: var(--ok); }
+.tag.bad { background: color-mix(in srgb, var(--bad) 15%, transparent); color: var(--bad); }
+.tag.warn { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
+.tag.mut { background: color-mix(in srgb, var(--sup) 20%, transparent); color: var(--muted); }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; color: var(--muted); font-weight: 500; padding: 5px 6px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--panel); }
+td { padding: 5px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.scroll { max-height: 420px; overflow: auto; }
+.bar { height: 6px; width: 90px; background: var(--line); border-radius: 3px; display: inline-block; vertical-align: middle; margin-right: 6px; }
+.bar i { display: block; height: 100%; border-radius: 3px; background: var(--accent); }
+.reasons { color: var(--muted); font-size: 12px; }
+#detail { font-size: 13px; }
+#login { max-width: 420px; margin: 80px auto; }
+.hidden { display: none !important; }
+.note { color: var(--muted); font-size: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>ICVSP operator dashboard</h1>
+    <div class="sub" id="subtitle">Trust-aware cooperative vehicle safety platform</div>
+  </div>
+  <div class="grow"></div>
+  <div id="simbox" class="hidden">
+    <div class="sub"><span id="simtime">0:00</span> of <span id="simend">0:00</span> simulated · <span id="speedlbl"></span></div>
+    <div class="progress"><div id="prog"></div></div>
+  </div>
+  <div id="controls" class="hidden" style="display:flex;gap:8px;align-items:center">
+    <button id="pause">Pause</button>
+    <select id="speed" title="Simulated seconds per real second">
+      <option value="1">1×</option><option value="5">5×</option><option value="10">10×</option>
+      <option value="20">20×</option><option value="40">40×</option><option value="80">80×</option>
+    </select>
+  </div>
+  <span class="pill"><span class="dot" id="conn"></span><span id="connlbl">connecting</span></span>
+</header>
+
+<div id="login" class="panel hidden">
+  <h2>Administrator token</h2>
+  <p class="note">The dashboard reads operator data, so it needs the backend's admin token
+    (<code>ICVSP_ADMIN_TOKEN</code>). The live demo opens this page with the token already filled in.</p>
+  <form id="loginform" style="display:flex;gap:8px"><input id="tok" type="password" style="flex:1" autocomplete="off"><button class="primary">Open</button></form>
+</div>
+
+<main id="app" class="hidden">
+  <section class="cards" id="cards"></section>
+
+  <section class="panel">
+    <h2 id="maptitle">Road view</h2>
+    <svg id="map" viewBox="0 0 1000 260" role="img" aria-label="Road with vehicles and hazards"></svg>
+    <div class="legend">
+      <span><i class="sw" style="background:var(--warn)"></i>Advisory (unconfirmed)</span>
+      <span><i class="sw" style="background:var(--bad)"></i>Warning (corroborated)</span>
+      <span><i class="sw" style="background:var(--conf)"></i>Warning (confirmed)</span>
+      <span><i class="sw" style="background:var(--sup)"></i>Suppressed</span>
+      <span><i class="sw" style="border:2px solid var(--muted)"></i>Real hazard (ground truth)</span>
+      <span><i class="sw" style="border:2px dashed var(--attacker)"></i>Invented by an attacker</span>
+      <span><i class="sw" style="background:var(--car);border-radius:2px"></i>Car</span>
+      <span><i class="sw" style="background:var(--attacker);border-radius:2px"></i>Attacker identity</span>
+    </div>
+    <div id="detail" class="note" style="margin-top:10px">Click a hazard to see why the trust engine gave it its state.</div>
+  </section>
+
+  <section class="panel" id="attackpanel">
+    <h2>Try an attack</h2>
+    <div class="attacks">
+      <button data-a="replay">Replay an accepted report</button>
+      <button data-a="tamper">Tamper with a signed report</button>
+      <button data-a="unknown">Report from an unregistered device</button>
+      <button data-a="fake">New device invents a pothole</button>
+      <button data-a="sybil">Sybil: 5 identities invent a speed bump</button>
+    </div>
+    <p class="note" style="margin:8px 0 0">Expected: replay → duplicate (no effect), tampering → 401 signature, unknown → 403,
+      a new device alone → advisory at most (suppressed once other cars drive past and see nothing), a Sybil group → collapsed into one source and flagged, no warning.</p>
+  </section>
+
+  <div class="two">
+    <section class="panel">
+      <h2>Live events</h2>
+      <div class="feed" id="feed"></div>
+    </section>
+    <section class="panel">
+      <h2>Devices and reliability</h2>
+      <div class="scroll"><table><thead><tr><th>Device</th><th>Status</th><th>Reliability</th><th>Confirmed / contradicted</th></tr></thead><tbody id="devices"></tbody></table></div>
+    </section>
+  </div>
+
+  <section class="panel">
+    <h2>Trust engine decisions</h2>
+    <div class="scroll"><table><thead><tr><th>Hazard</th><th>Type</th><th>State</th><th>Independent sources</th><th>Net evidence</th><th>Why</th></tr></thead><tbody id="hazards"></tbody></table></div>
+  </section>
+</main>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const STATE_COLOR = { unconfirmed: "var(--warn)", corroborated: "var(--bad)", confirmed: "var(--conf)", suppressed: "var(--sup)", expired: "var(--line)" };
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+const ATTACKER = /^(fake|sybil|clone|newcar|stranger|unknown)/;
+
+let token = "";
+const hashTok = new URLSearchParams(location.hash.slice(1)).get("token");
+try { if (hashTok) sessionStorage.setItem("icvsp_token", hashTok); token = sessionStorage.getItem("icvsp_token") || ""; } catch { token = hashTok || ""; }
+if (hashTok) history.replaceState(null, "", location.pathname);
+
+let demo = false, lastSeq = 0, feedItems = [], selected = null, overview = null, state = null, attackers = new Set();
+
+async function api(path, opts = {}) {
+  const r = await fetch(path, { ...opts, headers: { "X-Admin-Token": token, "Content-Type": "application/json", ...(opts.headers || {}) } });
+  if (r.status === 401) throw Object.assign(new Error("unauthorised"), { auth: true });
+  if (!r.ok) throw Object.assign(new Error(r.status), { status: r.status });
+  return r.json();
+}
+const fmt = (s) => { s = Math.max(0, Math.round(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
+const pct = (a, b) => b ? `${Math.round(100 * a / b)}%` : "–";
+
+function showLogin() { $("login").classList.remove("hidden"); $("app").classList.add("hidden"); }
+$("loginform").onsubmit = (e) => { e.preventDefault(); token = $("tok").value.trim(); try { sessionStorage.setItem("icvsp_token", token); } catch {} $("login").classList.add("hidden"); tick(); };
+
+async function tick() {
+  try {
+    overview = await api("/admin/overview?recent=40");
+    try { state = await api(`/demo/state?after=${lastSeq}`); demo = true; } catch (e) { if (e.auth) throw e; demo = false; state = null; }
+    $("conn").className = "dot on"; $("connlbl").textContent = demo ? "live demo" : "connected";
+    $("app").classList.remove("hidden");
+    render();
+  } catch (e) {
+    if (e.auth) { showLogin(); return; }
+    $("conn").className = "dot off"; $("connlbl").textContent = "backend unreachable";
+  }
+}
+
+function render() {
+  if (demo) {
+    attackers = new Set(state.attackers);
+    $("subtitle").textContent = `Live system simulation: ${state.title} · ${state.cars} cars`;
+    $("simbox").classList.remove("hidden"); $("controls").classList.remove("hidden");
+    $("simtime").textContent = fmt(state.t); $("simend").textContent = fmt(state.end);
+    $("prog").style.width = `${Math.min(100, 100 * state.t / state.end)}%`;
+    $("speedlbl").textContent = state.finished ? "finished" : state.paused ? "paused" : `${state.speed}× speed`;
+    $("pause").textContent = state.paused ? "Resume" : "Pause";
+    if (document.activeElement !== $("speed")) $("speed").value = String(state.speed);
+    for (const r of state.log) { feedItems.unshift(r); lastSeq = Math.max(lastSeq, r.seq); }
+    feedItems = feedItems.slice(0, 250);
+  } else {
+    $("attackpanel").classList.add("hidden");
+    feedItems = [
+      ...overview.reports.map((r) => ({ t: r.received_at, kind: "report", device: r.device_id, type: r.type, result: "accepted", abs: true })),
+      ...overview.rejections.map((r) => ({ t: r.received_at, kind: "report", device: r.device_id, result: "rejected: " + r.reason, abs: true })),
+    ].sort((a, b) => b.t - a.t).slice(0, 80);
+  }
+  renderCards(); renderMap(); renderFeed(); renderDevices(); renderHazards();
+}
+
+function renderCards() {
+  const hz = overview.hazards, c = (s) => hz.filter((h) => h.state === s).length;
+  const cards = [];
+  if (demo) {
+    const s = state.score, rep = state.reports, rej = Object.values(rep.rejected).reduce((a, b) => a + b, 0);
+    cards.push(
+      ["good", pct(s.real_warning, s.real_queries), `Real hazards: car warned ${s.warn_check_m} m before (${s.real_warning}/${s.real_queries})`],
+      ["good", pct(s.late_warning, s.late_queries), `Same, after the first 10 minutes (${s.late_warning}/${s.late_queries})`],
+      [s.fake_warning ? "badv" : "good", pct(s.fake_warning, s.fake_queries), `Invented hazards that reached a warning (${s.fake_warning}/${s.fake_queries})`],
+      [s.false_warning_queries ? "badv" : "good", String(s.false_warning_queries), "Hazard queries that showed any false warning"],
+      ["", `${rep.accepted}`, `Reports accepted (${rep.duplicate} duplicates, ${rej} rejected, ${rep.lost} lost on BLE)`],
+    );
+  } else {
+    cards.push(["", String(overview.counts.reports), "Reports stored"], ["", String(overview.counts.rejections), "Reports rejected"]);
+  }
+  cards.push(
+    ["", String(overview.counts.devices), `Registered devices (${overview.devices.filter((d) => d.status !== "ACTIVE").length} revoked)`],
+    ["", `${c("corroborated") + c("confirmed")} / ${c("unconfirmed")} / ${c("suppressed")}`, "Hazards: warning / advisory / suppressed"],
+  );
+  $("cards").innerHTML = cards.map(([k, v, l]) => `<div class="card ${k}"><div class="v">${esc(v)}</div><div class="l">${esc(l)}</div></div>`).join("");
+}
+
+function renderMap() {
+  const svg = $("map"), W = 1000, pad = 46;
+  let H = 260;
+  const pts = [];
+  if (demo) pts.push(state.road.start, state.road.end, ...state.truth.map((h) => [h.lat, h.lon]));
+  overview.hazards.forEach((h) => pts.push([h.latitude, h.longitude]));
+  overview.vehicles.forEach((v) => pts.push([v.lat, v.lon]));
+  if (!pts.length) { svg.setAttribute("viewBox", "0 0 1000 120"); svg.innerHTML = `<text x="500" y="60" text-anchor="middle">No positions yet</text>`; return; }
+  const lat0 = pts[0][0], k = Math.cos(lat0 * Math.PI / 180) * 111320;
+  const xy = ([la, lo]) => [(lo - pts[0][1]) * k, (la - lat0) * 110540];
+  const m = pts.map(xy), xs = m.map((p) => p[0]), ys = m.map((p) => p[1]);
+  let [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  const dx = Math.max(x1 - x0, 200), dy = Math.max(y1 - y0, 50), cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  const sc = Math.min((W - 2 * pad) / dx, 340 / dy);
+  H = Math.max(190, dy * sc + 2 * pad + 40);
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  const P = (la, lo) => { const [x, y] = xy([la, lo]); return [W / 2 + (x - cx) * sc, H / 2 - (y - cy) * sc]; };
+  // draw a marker beside the road line, on the side of its direction of travel (drive on the right)
+  const lane = (la, lo, hd, off = 16) => { const [x, y] = P(la, lo), r = hd * Math.PI / 180; return [x + Math.cos(r) * off, y + Math.sin(r) * off]; };
+  let g = "";
+  if (demo) {
+    const [ax, ay] = P(...state.road.start), [bx, by] = P(...state.road.end);
+    g += `<line x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" style="stroke:var(--road)" stroke-width="58" stroke-linecap="round"/>`;
+    g += `<line x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" style="stroke:var(--panel)" stroke-width="2" stroke-dasharray="14 12"/>`;
+    g += `<text x="${ax - 20}" y="${ay + 70}">eastbound →</text><text x="${bx + 20}" y="${by - 42}" text-anchor="end">← westbound</text>`;
+    for (let m = 0; m <= state.road.length_m; m += 500) {
+      const f = m / state.road.length_m, x = ax + (bx - ax) * f;
+      g += `<text x="${x}" y="${ay + 52}" text-anchor="middle">${m / 1000} km</text>`;
+    }
+    for (const h of state.truth) {
+      const [x, y] = lane(h.lat, h.lon, h.heading_deg);
+      g += h.real
+        ? `<circle cx="${x}" cy="${y}" r="13" fill="none" style="stroke:var(--muted)" stroke-width="2"><title>Real ${h.type} (ground truth)</title></circle>`
+        : `<circle cx="${x}" cy="${y}" r="13" fill="none" style="stroke:var(--attacker)" stroke-width="2" stroke-dasharray="4 3"><title>Invented ${h.type} (attacker)</title></circle>`;
+    }
+  }
+  for (const v of overview.vehicles) {
+    const [x, y] = lane(v.lat, v.lon, v.heading_deg, 16), col = attackers.has(v.vehicle_id) || ATTACKER.test(v.vehicle_id) ? "var(--attacker)" : "var(--car)";
+    const rot = v.heading_deg - 90;
+    g += `<g transform="translate(${x},${y}) rotate(${rot})"><path d="M-7,-4 L5,-4 L8,0 L5,4 L-7,4 Z" style="fill:${col}"/><title>${esc(v.vehicle_id)} · ${(v.speed_mps * 3.6).toFixed(0)} km/h</title></g>`;
+  }
+  for (const h of overview.hazards) {
+    if (h.state === "expired") continue;
+    const [x, y] = lane(h.latitude, h.longitude, h.heading_deg), r = 6 + Math.min(4, h.independent_sources) * 1.2;
+    const sel = selected === h.hazard_id ? ";stroke:var(--ink);stroke-width:2.5" : "";
+    g += `<g class="hz" data-id="${esc(h.hazard_id)}" style="cursor:pointer"><circle cx="${x}" cy="${y}" r="${r}" style="fill:${STATE_COLOR[h.state]}${sel}"/>`
+       + `<text x="${x}" y="${Math.sin(h.heading_deg * Math.PI / 180) >= 0 ? y + r + 13 : y - r - 5}" text-anchor="middle" style="fill:var(--ink)">${h.type === "speed_bump" ? "bump" : "pothole"}</text>`
+       + `<title>${esc(h.type)} · ${esc(h.state)} · ${h.independent_sources} source(s)</title></g>`;
+  }
+  svg.innerHTML = g;
+  svg.querySelectorAll(".hz").forEach((el) => el.onclick = () => { selected = el.dataset.id; renderMap(); renderDetail(); });
+  renderDetail();
+}
+
+function renderDetail() {
+  const h = overview.hazards.find((x) => x.hazard_id === selected);
+  if (!h) return;
+  $("detail").innerHTML = `<b>${esc(h.type)} ${esc(h.hazard_id)}</b> — <span class="tag ${tagFor(h.state)}">${esc(cap(h.state))}</span> ${esc(h.action)}<br>`
+    + `Reported by: ${h.support.map(esc).join(", ") || "–"} · ${h.contra} car(s) drove past without reporting it · net evidence ${h.net_evidence}`
+    + (h.sybil_suspected ? ` · <span class="tag bad">Sybil suspected</span>` : "")
+    + `<ul style="margin:6px 0 0;padding-left:18px">${h.reasons.map((r) => `<li>${esc(r)}</li>`).join("")}</ul>`;
+}
+
+const tagFor = (s) => ({ unconfirmed: "warn", corroborated: "bad", confirmed: "bad", suppressed: "mut", expired: "mut" }[s] || "mut");
+
+function feedTag(r) {
+  const res = r.result || "";
+  if (r.kind === "query") return r.level === "warning" ? (r.fake ? "bad" : "ok") : r.level === "advisory" ? "warn" : "mut";
+  if (res.startsWith("rejected")) return "bad";
+  if (res.includes("duplicate")) return "warn";
+  if (r.kind === "lost" || r.kind === "revoke") return "warn";
+  if (r.kind === "attack") return res.includes("accepted") ? "warn" : "bad";
+  return "ok";
+}
+const KIND = { report: "report", query: "warning check", lost: "lost", revoke: "revoked", settle: "reputation", attack: "attack", info: "info" };
+
+function renderFeed() {
+  $("feed").innerHTML = feedItems.slice(0, 120).map((r) => {
+    const t = r.abs ? new Date(r.t * 1000).toLocaleTimeString() : fmt(r.t);
+    const who = r.device ? `<b>${esc(r.device)}</b> ` : "";
+    const what = r.type && r.kind === "report" ? `${esc(r.type)} · ` : "";
+    return `<div><span class="t">${t}</span><span><span class="tag ${feedTag(r)}">${KIND[r.kind] || r.kind}</span>${who}${what}${esc(r.result)}</span></div>`;
+  }).join("") || `<p class="note">Waiting for events…</p>`;
+}
+
+function renderDevices() {
+  const rows = [...overview.devices].sort((a, b) => b.reliability - a.reliability);
+  $("devices").innerHTML = rows.map((d) => {
+    const att = attackers.has(d.device_id) || ATTACKER.test(d.device_id);
+    return `<tr><td style="${att ? "color:var(--attacker)" : ""}">${esc(d.device_id)}</td>`
+      + `<td><span class="tag ${d.status === "ACTIVE" ? "ok" : "bad"}">${esc(d.status)}</span></td>`
+      + `<td><span class="bar"><i style="width:${100 * d.reliability}%"></i></span>${d.reliability.toFixed(2)}</td>`
+      + `<td>${d.good} / ${d.bad}</td></tr>`;
+  }).join("");
+}
+
+function renderHazards() {
+  const order = { confirmed: 0, corroborated: 1, unconfirmed: 2, suppressed: 3, expired: 4 };
+  const rows = [...overview.hazards].sort((a, b) => order[a.state] - order[b.state]);
+  $("hazards").innerHTML = rows.map((h) => `<tr style="cursor:pointer" data-id="${esc(h.hazard_id)}"><td>${esc(h.hazard_id)}</td><td>${esc(h.type)}</td>`
+    + `<td><span class="tag ${tagFor(h.state)}">${esc(cap(h.state))}</span>${h.sybil_suspected ? `<span class="tag bad">Sybil</span>` : ""}</td>`
+    + `<td>${h.independent_sources} <span class="reasons">(${h.support.length} device${h.support.length === 1 ? "" : "s"})</span></td><td>${h.net_evidence}</td>`
+    + `<td class="reasons">${h.reasons.slice(0, 3).map(esc).join("<br>")}</td></tr>`).join("")
+    || `<tr><td colspan="6" class="note">No hazards yet.</td></tr>`;
+  $("hazards").querySelectorAll("tr[data-id]").forEach((tr) => tr.onclick = () => { selected = tr.dataset.id; renderMap(); $("map").scrollIntoView({ behavior: "smooth", block: "center" }); });
+}
+
+$("pause").onclick = () => api("/demo/control", { method: "POST", body: JSON.stringify({ paused: !state.paused }) }).then(tick);
+$("speed").onchange = (e) => api("/demo/control", { method: "POST", body: JSON.stringify({ speed: Number(e.target.value) }) }).then(tick);
+document.querySelectorAll("[data-a]").forEach((b) => b.onclick = () => api("/demo/inject", { method: "POST", body: JSON.stringify({ kind: b.dataset.a }) }).then(() => setTimeout(tick, 400)));
+
+if (!token) showLogin(); else tick();
+setInterval(() => { if (token && $("login").classList.contains("hidden")) tick(); }, 1000);
+</script>
+</body>
+</html>

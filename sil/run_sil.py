@@ -128,11 +128,11 @@ class Vehicle:
     def travelled(self, pos_m: float) -> float:
         return pos_m if self.direction == "E" else ROAD_M - pos_m
 
-    def run(self) -> list[tuple[float, str]]:
+    def run(self, utc0: float = UTC0) -> list[tuple[float, str]]:
         """Runs the device code; returns (emission time from simulation start, signed line)."""
         lat, lon = position(self.direction, 0)
         lines = [f"id {self.vid}", f"boot {self.boot}", f"seed {self.seed}",
-                 f"start {int((UTC0 + self.start) * 1000)}", f"origin {lat} {lon} {90 if self.direction == 'E' else 270}",
+                 f"start {int((utc0 + self.start) * 1000)}", f"origin {lat} {lon} {90 if self.direction == 'E' else 270}",
                  f"speed {self.speed_kmh}", f"duration {ROAD_M / self.v + 6:.1f}",
                  f"sim_seed {zlib.crc32(self.vid.encode()) % 100000 + 1}", *self.script]
         if self.gps_loss:
@@ -183,25 +183,32 @@ def plan(scn: Scenario, rng: random.Random) -> tuple[list[Vehicle], list[Vehicle
 
 
 # ---------------------------------------------------------------------------------------------------------
-def simulate(scn: Scenario, seed: int) -> dict:
+@dataclass
+class Run:
+    """A scenario as a time-ordered list of events (seconds from the start, kind, payload). The batch run below
+    and the live demo (sil/live_demo.py) both play this list against the backend."""
+    scn: Scenario
+    utc0: float
+    honest: list[Vehicle]
+    attackers: list[Vehicle]
+    emitted: dict[str, list[tuple[float, str]]]
+    fakes: list[tuple]
+    events: list[tuple]
+
+
+def prepare(scn: Scenario, seed: int, utc0: float = UTC0) -> Run:
     rng = random.Random(seed)
     honest, attackers = plan(scn, rng)
-    clock = [UTC0]
-    store = Store()
-    client = TestClient(create_app(store, lambda: clock[0], admin_token="sil"))
 
     vetted = set(rng.sample([c.vid for c in honest], int(scn.vetted * len(honest))))
     # devices are registered with the public key the device code derived from its seed (seen in its reports)
-    events = []          # (time from start, kind, payload)
+    events = []
     emitted = {}
     for car in honest + attackers:
-        reports = car.run()
+        reports = car.run(utc0)
         emitted[car.vid] = reports
-        key = json.loads(reports[0][1])["public_key"] if reports else None
-        if key:
-            r = client.post("/devices", json={"device_id": car.vid, "public_key": key,
-                                              "vetted": car.vid in vetted}, headers=ADMIN)
-            assert r.status_code == 201, r.text
+        if reports:
+            events.append((-1.0, "register", (car.vid, json.loads(reports[0][1])["public_key"], car.vid in vetted)))
         for t_emit, line in reports:
             if rng.random() < scn.faults.ble_loss:
                 events.append((t_emit, "lost", car.vid))
@@ -219,7 +226,7 @@ def simulate(scn: Scenario, seed: int) -> dict:
             if rng.random() < scn.faults.beacon_loss:
                 continue
             lat, lon = position(car.direction, min(car.v * k, ROAD_M))
-            batch.append({"vehicle_id": car.vid, "t": UTC0 + car.start + k, "lat": lat, "lon": lon,
+            batch.append({"vehicle_id": car.vid, "t": utc0 + car.start + k, "lat": lat, "lon": lon,
                           "speed_mps": car.v, "heading_deg": 90 if car.direction == "E" else 270})
             if len(batch) == 10 or k == int(dur) - 1:
                 t_up = car.start + k + 0.5
@@ -234,7 +241,7 @@ def simulate(scn: Scenario, seed: int) -> dict:
         events.append((scn.minutes * 30, "report", genuine.replace('"severity":"', '"severity":"x')))  # tampered
         stranger = Vehicle("unknown-99", "E", 100, 40, f"{rng.getrandbits(256):064x}")
         stranger.script.append(f"imu pothole {1000 / stranger.v:.3f} 9")
-        for t, line in stranger.run():
+        for t, line in stranger.run(utc0):
             events.append((t + 1, "report", line))                                           # not registered
         # revoke one Sybil identity halfway; its later reports must be refused
         events.append((900 + 30, "revoke", "sybil-4"))
@@ -256,48 +263,87 @@ def simulate(scn: Scenario, seed: int) -> dict:
         t += settle_every
 
     events.sort(key=lambda e: e[0])
-    results = {"accepted": 0, "duplicate": 0, "rejected": {}, "lost": 0}
-    queries = []
-    for t_rel, kind, payload in events:
-        clock[0] = UTC0 + t_rel
-        if kind == "report":
-            r = client.post("/reports", content=payload.encode(), headers={"Content-Type": "application/json"})
-            if r.status_code == 201:
-                results[r.json()["status"]] += 1
-            else:
-                reason = r.json()["detail"].split(":")[0]
-                results["rejected"][reason] = results["rejected"].get(reason, 0) + 1
-        elif kind == "lost":
-            results["lost"] += 1
-        elif kind == "beacons":
-            client.post("/beacons", json=payload)
-        elif kind == "revoke":
-            client.post(f"/devices/{payload}/revoke", headers=ADMIN)
-        elif kind == "settle":
-            client.post("/admin/settle", headers=ADMIN)
-        elif kind == "query":
-            car, i = payload
-            typ, pos, lane = (HAZARDS + fakes)[i]
-            lat, lon = position(car.direction, car.travelled(pos) - WARN_CHECK_M)
-            hz = client.get("/hazards", params={"lat": lat, "lon": lon, "radius_m": WARN_CHECK_M + 50,
-                                                "heading_deg": 90 if car.direction == "E" else 270}).json()
-            hlat, hlon = position("E", pos)
-            match = [h for h in hz if h["type"] == typ and _dist(h, hlat, hlon) <= MATCH_M]
-            real_pos = [(rt, position("E", rp)) for rt, rp, rl in HAZARDS if rl == car.direction]
-            false_warn = [h for h in hz if h["level"] == "warning" and not any(
-                h["type"] == rt and _dist(h, *rp) <= MATCH_M for rt, rp in real_pos)]
-            level = "warning" if any(h["level"] == "warning" for h in match) else (
-                "advisory" if match else "none")
-            queries.append({"t": t_rel, "car": car.vid, "hazard": i, "fake": i >= len(HAZARDS), "level": level,
-                            "false_warnings": len(false_warn)})
+    return Run(scn, utc0, honest, attackers, emitted, fakes, events)
 
-    # latency: impact (detected_at) to device emission, from the device code itself
-    lat_dev = []
-    for car in honest:
-        for t_emit, line in emitted[car.vid]:
+
+def new_results() -> dict:
+    return {"accepted": 0, "duplicate": 0, "rejected": {}, "lost": 0}
+
+
+def apply(client, run: Run, t_rel: float, kind: str, payload, results: dict, queries: list) -> dict | None:
+    """Plays one event against the backend (a TestClient or a real HTTP client); returns a log record for the
+    events worth showing (reports, revocations, warnings)."""
+    if kind == "register":
+        vid, key, vetted = payload
+        r = client.post("/devices", json={"device_id": vid, "public_key": key, "vetted": vetted}, headers=ADMIN)
+        assert r.status_code == 201, r.text
+    elif kind == "report":
+        r = client.post("/reports", content=payload.encode(), headers={"Content-Type": "application/json"})
+        env = json.loads(payload)
+        rec = {"t": t_rel, "kind": "report", "device": env["sender"], "event_id": env["msg_id"],
+               "type": env["event"].get("type"), "http": r.status_code}
+        if r.status_code == 201:
+            results[r.json()["status"]] += 1
+            rec["result"] = r.json()["status"]
+        else:
+            reason = r.json()["detail"].split(":")[0]
+            results["rejected"][reason] = results["rejected"].get(reason, 0) + 1
+            rec["result"] = "rejected: " + r.json()["detail"]
+        return rec
+    elif kind == "lost":
+        results["lost"] += 1
+        return {"t": t_rel, "kind": "lost", "device": payload, "result": "report lost on the BLE link"}
+    elif kind == "beacons":
+        client.post("/beacons", json=payload)
+    elif kind == "revoke":
+        client.post(f"/devices/{payload}/revoke", headers=ADMIN)
+        return {"t": t_rel, "kind": "revoke", "device": payload, "result": "device revoked by the administrator"}
+    elif kind == "settle":
+        upd = client.post("/admin/settle", headers=ADMIN).json()["updates"]
+        if upd:
+            return {"t": t_rel, "kind": "settle", "result": f"reputation updated ({len(upd)} changes)",
+                    "details": upd}
+    elif kind == "query":
+        car, i = payload
+        typ, pos, lane = (HAZARDS + run.fakes)[i]
+        lat, lon = position(car.direction, car.travelled(pos) - WARN_CHECK_M)
+        hz = client.get("/hazards", params={"lat": lat, "lon": lon, "radius_m": WARN_CHECK_M + 50,
+                                            "heading_deg": 90 if car.direction == "E" else 270}).json()
+        hlat, hlon = position("E", pos)
+        match = [h for h in hz if h["type"] == typ and _dist(h, hlat, hlon) <= MATCH_M]
+        real_pos = [(rt, position("E", rp)) for rt, rp, rl in HAZARDS if rl == car.direction]
+        false_warn = [h for h in hz if h["level"] == "warning" and not any(
+            h["type"] == rt and _dist(h, *rp) <= MATCH_M for rt, rp in real_pos)]
+        level = "warning" if any(h["level"] == "warning" for h in match) else (
+            "advisory" if match else "none")
+        q = {"t": t_rel, "car": car.vid, "hazard": i, "fake": i >= len(HAZARDS), "level": level,
+             "false_warnings": len(false_warn)}
+        queries.append(q)
+        return {"t": t_rel, "kind": "query", "device": car.vid, "type": typ, "fake": q["fake"], "level": level,
+                "result": f"{WARN_CHECK_M:.0f} m before {'an invented' if q['fake'] else 'a real'} {typ}: {level}"}
+    return None
+
+
+def simulate(scn: Scenario, seed: int) -> dict:
+    clock = [UTC0]
+    store = Store()
+    client = TestClient(create_app(store, lambda: clock[0], admin_token="sil"))
+    run = prepare(scn, seed)
+    results, queries = new_results(), []
+    for t_rel, kind, payload in run.events:
+        clock[0] = UTC0 + t_rel
+        apply(client, run, t_rel, kind, payload, results, queries)
+    return summarise(scn, run.honest, run.attackers, results, queries, device_delays(run), store)
+
+
+def device_delays(run: Run) -> list[float]:
+    """Impact (detected_at) to device emission, from the device code itself."""
+    out = []
+    for car in run.honest:
+        for t_emit, line in run.emitted[car.vid]:
             ev = json.loads(line)["event"]
-            lat_dev.append(t_emit - (from_iso(ev["detected_at"]) - UTC0))
-    return summarise(scn, honest, attackers, results, queries, lat_dev, store)
+            out.append(t_emit - (from_iso(ev["detected_at"]) - run.utc0))
+    return out
 
 
 def _dist(h: dict, lat: float, lon: float) -> float:
