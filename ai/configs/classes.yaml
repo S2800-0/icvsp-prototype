@@ -22,10 +22,15 @@ sources:
 
   # extra public datasets (Kaggle), added in v4. Single-class pothole sets; capped to keep training within
   # Kaggle's 12-hour limit (images with speed bumps are kept first).
+  # Indian Roads ships no class names; 0 / 1 / 2 checked against its file names (UnMarkedBump, SB_ -> 0;
+  # PotHoles -> 1; UnPavedRoad -> 2). Unpaved road is not a hazard class here, so its boxes are dropped.
   pub_indian_roads:
+    names: [speed_bump, pothole, unpaved_road]
     max_images: 3000
+  # PotHoleNet: class 1 is manhole covers (checked on crops). Excluded, so those images teach the model
+  # that a manhole is not a pothole.
   pub_potholenet:
-    names: [pothole]
+    names: [pothole, manhole]
     max_images: 1500
   pub_bharatpothole:
     names: [pothole]

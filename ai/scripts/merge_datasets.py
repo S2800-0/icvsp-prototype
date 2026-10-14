@@ -104,6 +104,16 @@ def split_of(img: Path):
     return 'train'
 
 
+def yolo_box(v: list[str]) -> list[str]:
+    """A YOLO box (cx cy w h) from a label line's coordinates; a polygon (x1 y1 x2 y2 x3 y3 ..., as in some
+    Roboflow exports) becomes its bounding box instead of being misread as a box."""
+    if len(v) == 4:
+        return v
+    xs, ys = [float(x) for x in v[0::2]], [float(y) for y in v[1::2]]
+    x0, x1, y0, y1 = max(0.0, min(xs)), min(1.0, max(xs)), max(0.0, min(ys)), min(1.0, max(ys))
+    return [f'{(x0 + x1) / 2:.6f}', f'{(y0 + y1) / 2:.6f}', f'{x1 - x0:.6f}', f'{y1 - y0:.6f}']
+
+
 def label_for(img: Path):
     # YOLO convention: .../images/x.jpg <-> .../labels/x.txt ; fall back to same folder
     parts = list(img.parts)
@@ -194,7 +204,7 @@ def main():
                         continue
                     cid = int(float(f[0]))
                     if cid in cmap:
-                        lines.append(' '.join([str(cmap[cid])] + f[1:5]))
+                        lines.append(' '.join([str(cmap[cid])] + yolo_box(f[1:])))
                     else:
                         rep['dropped_boxes'] += 1
             pending.append((img, lines, split_of(img) if keeps_test else 'train'))

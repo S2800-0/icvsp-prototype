@@ -312,7 +312,7 @@ if EXTRA:   # read in place from /kaggle/input (no copy); only images the merge 
         link = pathlib.Path(f'/tmp/raw/{folder}')
         if not link.exists():
             link.symlink_to(d, target_is_directory=True)
-!python scripts/merge_datasets.py --raw /tmp/raw --out /tmp/merged
+subprocess.run(['python', 'scripts/merge_datasets.py', '--raw', '/tmp/raw', '--out', '/tmp/merged'], check=True)  # stop here if the merge fails
 if EGYPT and NIGHT_SHARE > 0:
     !python scripts/make_night.py --data /tmp/merged --share {NIGHT_SHARE}
 !cp /tmp/merged/merge_report.json runs/"""),
