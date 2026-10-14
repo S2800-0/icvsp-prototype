@@ -138,7 +138,7 @@ class Service:
                     continue
             out.append({
                 "hazard_id": d.hazard_id, "type": d.type, "state": d.state.value,
-                "level": "advisory" if d.state == HazardState.UNCONFIRMED else "warning",
+                "level": "advisory" if d.state == HazardState.UNCONFIRMED else "warning", "severity": d.severity,
                 "latitude": round(d.lat, 6), "longitude": round(d.lon, 6), "heading_deg": round(d.heading_deg, 1),
                 "distance_m": round(dist, 1), "independent_sources": d.independent_sources,
                 "net_evidence": round(d.net, 3), "reasons": d.reasons,
@@ -159,6 +159,7 @@ class Service:
                             "reliability": round(rep.score(d["device_id"]), 3)})
         hazards = [{
             "hazard_id": d.hazard_id, "type": d.type, "state": d.state.value, "action": d.action,
+            "severity": d.severity,
             "latitude": round(d.lat, 6), "longitude": round(d.lon, 6), "heading_deg": round(d.heading_deg, 1),
             "independent_sources": d.independent_sources, "net_evidence": round(d.net, 3),
             "support": sorted({e.source for e in d.support}), "contra": len({e.source for e in d.contra}),

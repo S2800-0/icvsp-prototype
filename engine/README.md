@@ -13,7 +13,7 @@ cd engine
 python3 -m icvsp.demo                 # list scenarios
 python3 -m icvsp.demo sybil           # run one
 python3 -m icvsp.demo all             # run all seven
-python3 -m unittest -v                # 46 tests, including every scenario's expected outcome
+python3 -m unittest -v                # 52 tests, including every scenario's expected outcome
 ```
 
 Export a scenario to trace files and run the engine on the files only:
@@ -91,7 +91,7 @@ icvsp/baselines.py    B1 naive forwarding, B2 majority vote
 icvsp/experiment.py   Stage 2 runner (metrics, confidence intervals, summary)
 icvsp/plot.py         Stage 2 charts
 results/              Stage 2 output (CSV, summary.md, charts)
-tests/                46 tests
+tests/                52 tests
 ```
 
 ## Trace format (the SUMO swap point)

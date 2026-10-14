@@ -193,14 +193,21 @@ class Hazards(Base):
                          "heading_deg": heading})
         self.assertEqual(self.client.post("/beacons", json=rows).status_code, 200)
 
-    def two_reports(self, vetted):
+    def two_reports(self, vetted, **report):
         cars = [Car("car-a"), Car("car-b")]
         for i, c in enumerate(cars):
             self.register(c.id, c.public_hex, vetted=vetted)
             t = T0 + 30 * i
             self.drive(c.id, t - 10, -110)   # passes the hazard (at 0 m) about 10 s after t - 10
-            self.assertEqual(self.post(c.report(t, self.LAT, self.LON)).status_code, 201)
+            self.assertEqual(self.post(c.report(t, self.LAT, self.LON, **report)).status_code, 201)
         self.clock.t = T0 + 60
+
+    def test_minor_hazard_is_not_shown_and_severity_is_reported(self):
+        """Severity scope: two trusted cars that both measured a small jolt do not make a hazard worth showing."""
+        self.two_reports(vetted=True, severity="low", imu_peak_g=0.2)
+        self.assertEqual(self.client.get("/hazards", params={"lat": self.LAT, "lon": self.LON}).json(), [])
+        ov = self.client.get("/admin/overview", headers=ADMIN).json()
+        self.assertEqual([(h["state"], h["severity"]) for h in ov["hazards"]], [("suppressed", "low")])
 
     def test_two_vetted_cars_give_a_warning_ahead_only(self):
         self.two_reports(vetted=True)
@@ -209,6 +216,7 @@ class Hazards(Base):
         self.assertEqual(len(hz), 1)
         self.assertEqual(hz[0]["level"], "warning")
         self.assertEqual(hz[0]["independent_sources"], 2)
+        self.assertEqual(hz[0]["severity"], "high")
         # a car going the other way, or already past it, is not warned
         self.assertEqual(self.client.get("/hazards", params={"lat": ahead_lat, "lon": ahead_lon,
                                                              "heading_deg": 270}).json(), [])

@@ -39,6 +39,7 @@ NFR-14,system,Should,The automated test suite shall run in under one minute and 
 FR-24,system,Must,"A Safety Event shall reach following vehicles within radio range without the cloud (direct V2V), and through a cloud relay when they are out of range."
 FR-25,system,Must,"The in-vehicle unit shall be the single trusted source of time and position (GNSS), and its interface to the mobile app shall define timestamp alignment and behaviour on communication loss."
 FR-26,system,Must,The in-vehicle unit shall warn its own driver about hazards in its local hazard cache without the cloud or any other vehicle.
+FR-27,system,Must (proposed),"The system shall issue warnings only for hazards that require a driver to stop, slow down or change path: raised at least as high as a standard speed bump, or sunk at least as deep, marked or not. Hazards measured below this shall not raise any alert; hazards whose size has not been measured (camera only) shall raise an advisory at most."
 FR-SEC-01,security,Core,Authenticate users before protected functionality.
 FR-SEC-02,security,Core,"Enforce Driver, Ambulance, and Administrator authorization on the backend."
 FR-SEC-03,security,Core,Assign each registered device a unique identity associated with an Ed25519 public key.

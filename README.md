@@ -20,13 +20,13 @@ This repository holds the working prototypes:
 
 | Component | Status |
 |---|---|
-| Trust & consensus engine (schema checks, plausibility, trust, consensus, Sybil / replay defence, targeting) | ✅ Prototype, 46 tests, evaluated in simulation; accepts pothole and speed-bump reports |
+| Trust & consensus engine (schema checks, plausibility, trust, consensus, Sybil / replay defence, targeting) | ✅ Prototype, 52 tests, evaluated in simulation; accepts pothole and speed-bump reports; warns only about hazards big enough to make a driver stop, slow down or swerve (proposed FR-27) |
 | Camera detector, Pro unit (YOLO11n) | ✅ v3c, fine-tuned on Egyptian day and night footage: public test mAP50 0.846 |
 | False-alarm filters for speed bumps (road-surface check, motion check) | ✅ Cut false bump flags by over 95 % on held-out Egyptian video |
 | Egyptian road tests | 🟡 Potholes detected above chance by day and night; many unpainted bumps are barely visible on camera, so the IMU becomes the main bump sensor. Own recordings needed for a larger test set |
 | Device firmware (IMU detector, camera decision logic, camera + IMU fusion, signed reports, replay window) | ✅ 52 unit tests on a laptop (PlatformIO native); logic scored on held-out video; thresholds still to be tuned on real recordings |
 | Camera detector, Lite unit (ESPDet-Pico on ESP32-S3) | 🟡 8-bit model 486 KB, speed-bump mAP50 0.72 in ESP-PPQ simulation; builds and runs in the ESP32-S3 emulator, on-chip accuracy needs a board |
-| Backend API (device registry, signed-report checks, replay defence, hazard query, reputation, operator dashboard) | ✅ Prototype, 20 API tests; SQLite for now, Supabase next. Sign-in / roles, rate limits and signed alerts to phones still to do |
+| Backend API (device registry, signed-report checks, replay defence, hazard query, reputation, operator dashboard) | ✅ Prototype, 21 API tests; SQLite for now, Supabase next. Sign-in / roles, rate limits and signed alerts to phones still to do |
 | System simulation (real device code → backend → trust engine → warnings), with faults and attacks | ✅ 4 scenarios, 0 % false warnings; live demo with the dashboard |
 | Detector v4 (adds three public Kaggle pothole / road datasets) | 🟡 Training on Kaggle; compared with v3c when done |
 | V2V radio, cloud deployment, in-vehicle hardware | ⏳ Planned (see roadmap) |
@@ -137,7 +137,7 @@ Sensor hit rates and network behaviour are assumptions, so these numbers describ
 performance: [`sil/results/summary.md`](sil/results/summary.md).
 
 ```bash
-cd backend && python3 -m unittest -v           # 20 API tests
+cd backend && python3 -m unittest -v           # 21 API tests
 python3 sil/run_sil.py                         # whole-chain simulation, 4 scenarios
 python3 sil/live_demo.py                       # live demo: simulation against the real backend, in the dashboard
 ```
@@ -148,7 +148,7 @@ backend and the trust engine answer.
 
 ## Verification
 
-Every push runs the V-cycle checks on GitHub Actions: 123 tests (52 device, 46 engine, 20 backend, 5 system
+Every push runs the V-cycle checks on GitHub Actions: 130 tests (52 device, 52 engine, 21 backend, 5 system
 simulation), the device → engine integration check, static analysis, and a traceability check that links every test to the
 requirement IDs of the team's V-cycle workbooks and fails if a test is unlisted or failing. The
 requirement → test → result report appears on each run's summary page. Details: [`verification/`](verification/).
@@ -169,7 +169,7 @@ Details, including how to record and label the Egyptian test set, are in [`ai/RE
 ```
 engine/
 ├── icvsp/              decision engine: validation, trust, consensus, risk, simulator, experiments
-├── tests/              46 tests, including every scenario's expected outcome and cold start
+├── tests/              52 tests, including every scenario's expected outcome, cold start and severity scope
 ├── schema/             Safety Event JSON schema
 └── results/            Stage 2 experiment results and charts
 ai/
@@ -187,7 +187,7 @@ firmware/
 └── espdet_qemu/        ESPDet-Pico on the ESP32-S3 (ESP-IDF + ESP-DL), run in QEMU
 backend/
 ├── icvsp_backend/      API, report checks, storage (SQLite), operator dashboard
-└── tests/              20 API tests
+└── tests/              21 API tests
 sil/                    whole-chain simulation, live demo, results
 verification/           requirements, traceability list, golden device reports, CI check
 ```

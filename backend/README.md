@@ -6,7 +6,7 @@ engine (`engine/`) and answers "which hazards are ahead of me?". FastAPI + SQLit
 
 ```bash
 cd backend
-python3 -m unittest -v                                          # 20 API tests
+python3 -m unittest -v                                          # 21 API tests
 ICVSP_ADMIN_TOKEN=dev uvicorn --factory icvsp_backend.app:create_app --reload
 # interactive API docs: http://127.0.0.1:8000/docs
 # operator dashboard:   http://127.0.0.1:8000/dashboard (asks for the admin token)

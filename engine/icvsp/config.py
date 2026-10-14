@@ -50,6 +50,15 @@ class Config:
     cold_start_min_g: float = 0.8        # consistency needed, i.e. good GPS and plausible report
     expire_freshness: float = 0.1        # best supporting freshness below this → EXPIRED
 
+    # --- severity scope ---
+    # ICVSP warns only about hazards big enough to make a driver stop, slow down or steer around them:
+    # raised at least as high as a normal speed bump, or sunk at least as deep. The device measures this
+    # with the IMU jolt (severity low / medium / high, imu_peak_g present). A warning needs at least one
+    # report measured at this severity or above. Reports measured below it are out of scope; camera-only
+    # reports (no jolt measured, size unknown) can raise an advisory at most. The jolt bands themselves are
+    # starting guesses and must be calibrated on recordings, including the speed the hazard was hit at.
+    warn_min_severity: str = "medium"
+
     # --- targeting ---
     warn_horizon_m: float = 500.0
     active_window_s: float = 5.0         # a vehicle is "on the road now" if seen this recently

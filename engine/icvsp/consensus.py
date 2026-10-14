@@ -65,6 +65,7 @@ class Decision:
     groups: list[list[str]]           # groups of identities that were collapsed into one
     reasons: list[str]
     sybil_suspected: bool = False
+    severity: str = "unknown"         # largest measured severity among the reports, or "unknown" (camera only)
 
     @property
     def action(self) -> str:
@@ -244,8 +245,36 @@ class Engine:
             state = HazardState.UNCONFIRMED
             reasons.append(cold)
 
+        severity, state, note = self._severity_scope(state, best)
+        if note:
+            reasons.append(note)
+
         return Decision(hid, head.type, lat, lon, heading, head.road_segment, first_seen, state, net,
-                        n_sources, support, contra, [[e.source for e in g] for g in collapsed], reasons, sybil)
+                        n_sources, support, contra, [[e.source for e in g] for g in collapsed], reasons, sybil,
+                        severity)
+
+    def _severity_scope(self, state: HazardState, best: dict[str, Scored]) -> tuple[str, HazardState, str | None]:
+        """Only hazards that make a driver stop, slow down or swerve are warned about (Config.warn_min_severity).
+        A report's severity counts as measured when it is above "low" or comes with an IMU jolt; a "low" report
+        without a jolt is camera-only, size unknown. Returns (hazard severity, state, reason or None)."""
+        rank = {"low": 0, "medium": 1, "high": 2}
+        need = rank[self.cfg.warn_min_severity]
+        measured = [s.event.severity for s in best.values()
+                    if s.event.severity != "low" or s.event.imu_peak_g is not None]
+        severity = max(measured, key=rank.__getitem__) if measured else "unknown"
+        if state not in (HazardState.UNCONFIRMED, HazardState.CORROBORATED, HazardState.CONFIRMED):
+            return severity, state, None
+        if measured and rank[severity] >= need:
+            return severity, state, None
+        if len(measured) == len(best):          # every report measured it, all below the threshold
+            return severity, HazardState.SUPPRESSED, (
+                f"severity: every report measured it as {severity}, below {self.cfg.warn_min_severity}: "
+                "not big enough to make a driver stop, slow down or swerve → suppressed")
+        if state != HazardState.UNCONFIRMED:   # camera-only (size unknown) reports can give an advisory at most
+            return severity, HazardState.UNCONFIRMED, (
+                f"severity: no report measured it at {self.cfg.warn_min_severity} or above (camera only, size "
+                "unknown) → advisory until a vehicle's IMU measures it")
+        return severity, state, None
 
     def _cold_start(self, state: HazardState, best: dict[str, Scored], contra: list[Evidence],
                     sybil: bool) -> str | None:
