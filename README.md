@@ -11,6 +11,10 @@ This repository holds the working prototypes:
   for a low-cost ESP32-S3 unit.
 - **`firmware/`: the device firmware**: IMU hazard detection, signed reports and replay protection, unit-tested on a
   laptop, and the ESPDet-Pico model built for the ESP32-S3.
+- **`backend/`: the server** (FastAPI): checks signed reports, runs the trust engine, answers "which hazards are ahead?"
+  and has an operator dashboard.
+- **`sil/`: the system simulation**: the whole chain without hardware, with a live demo in the dashboard.
+- **`verification/`: V-cycle evidence**: requirement → test → result traceability, checked on every push.
 
 ## Current status
 
@@ -22,7 +26,10 @@ This repository holds the working prototypes:
 | Egyptian road tests | 🟡 Potholes detected above chance by day and night; many unpainted bumps are barely visible on camera, so the IMU becomes the main bump sensor. Own recordings needed for a larger test set |
 | Device firmware (IMU detector, camera decision logic, camera + IMU fusion, signed reports, replay window) | ✅ 52 unit tests on a laptop (PlatformIO native); logic scored on held-out video; thresholds still to be tuned on real recordings |
 | Camera detector, Lite unit (ESPDet-Pico on ESP32-S3) | 🟡 8-bit model 486 KB, speed-bump mAP50 0.72 in ESP-PPQ simulation; builds and runs in the ESP32-S3 emulator, on-chip accuracy needs a board |
-| V2V radio, cloud, in-vehicle hardware | ⏳ Planned (see roadmap) |
+| Backend API (device registry, signed-report checks, replay defence, hazard query, reputation, operator dashboard) | ✅ Prototype, 20 API tests; SQLite for now, Supabase next. Sign-in / roles, rate limits and signed alerts to phones still to do |
+| System simulation (real device code → backend → trust engine → warnings), with faults and attacks | ✅ 4 scenarios, 0 % false warnings; live demo with the dashboard |
+| Detector v4 (adds three public Kaggle pothole / road datasets) | 🟡 Training on Kaggle; compared with v3c when done |
+| V2V radio, cloud deployment, in-vehicle hardware | ⏳ Planned (see roadmap) |
 
 ## Engine: simulated results
 
@@ -106,22 +113,42 @@ cd firmware && pio test -e native          # 52 unit tests
 python tools/check_with_engine.py          # signed reports checked from the backend side
 ```
 
-### Backend and system simulation
+## Backend and system simulation
 
-[`backend/`](backend/) is the server prototype (FastAPI): it registers devices, verifies each signed report
-against the registered key, rejects replays and malformed reports, runs the trust engine and answers
-`GET /hazards` for cars approaching a hazard. [`sil/`](sil/) simulates the whole chain without hardware: dozens
-of cars each run the real device code, their phones upload to the backend through lossy links, and following
-cars are warned or not. Results with the assumptions stated: [`sil/results/summary.md`](sil/results/summary.md).
+[`backend/`](backend/) is the server prototype (FastAPI): it registers and revokes devices, verifies each signed
+report against the registered key, rejects replays and malformed reports (and logs why), runs the trust engine,
+answers `GET /hazards` for cars approaching a hazard and updates device reputation from confirmed or contradicted
+reports. An operator dashboard (`/dashboard`) shows every hazard decision with the engine's reasons, device
+reliability, live vehicle positions and rejections. Endpoints: [`backend/README.md`](backend/README.md).
+
+[`sil/`](sil/) simulates the whole chain without hardware: dozens of cars each run the real device code, their
+phones upload to the backend through lossy links, and following cars are warned or not. Scenarios: new devices,
+a vetted fleet, faults (BLE loss, internet outage, GPS loss) and attacks (fake reports, Sybil identities, replay,
+tampering, unregistered and revoked devices).
+
+| Scenario | Cars warned before a real hazard (after the first 10 min) | False warnings |
+|---|---|---|
+| All devices new | 77 % | 0 % |
+| 30 % vetted fleet | 80 % | 0 % |
+| Fleet + faults | 60 % | 0 % |
+| Fleet + attacks | 67 % | 0 % (invented hazards never reached a warning) |
+
+Sensor hit rates and network behaviour are assumptions, so these numbers describe the system logic, not road
+performance: [`sil/results/summary.md`](sil/results/summary.md).
 
 ```bash
-cd backend && python3 -m unittest -v           # 19 API tests
+cd backend && python3 -m unittest -v           # 20 API tests
 python3 sil/run_sil.py                         # whole-chain simulation, 4 scenarios
+python3 sil/live_demo.py                       # live demo: simulation against the real backend, in the dashboard
 ```
 
-### Verification
+The live demo plays a scenario in sped-up real time over HTTP and opens the dashboard, where you can pause, change
+speed and launch attacks (replay, tampering, unregistered device, a fake pothole, a Sybil group) to watch the
+backend and the trust engine answer.
 
-Every push runs the V-cycle checks on GitHub Actions: 122 tests (52 device, 46 engine, 19 backend, 5 system
+## Verification
+
+Every push runs the V-cycle checks on GitHub Actions: 123 tests (52 device, 46 engine, 20 backend, 5 system
 simulation), the device → engine integration check, static analysis, and a traceability check that links every test to the
 requirement IDs of the team's V-cycle workbooks and fails if a test is unlisted or failing. The
 requirement → test → result report appears on each run's summary page. Details: [`verification/`](verification/).
@@ -158,6 +185,11 @@ firmware/
 ├── test/               52 unit tests (PlatformIO native)
 ├── tools/              end-to-end check with the engine
 └── espdet_qemu/        ESPDet-Pico on the ESP32-S3 (ESP-IDF + ESP-DL), run in QEMU
+backend/
+├── icvsp_backend/      API, report checks, storage (SQLite), operator dashboard
+└── tests/              20 API tests
+sil/                    whole-chain simulation, live demo, results
+verification/           requirements, traceability list, golden device reports, CI check
 ```
 
 ## Roadmap
@@ -166,8 +198,9 @@ firmware/
 2. Tune the IMU detector on those recordings; camera + IMU fusion
 3. First boards: ESP32-S3 (IMU unit, ESPDet-Pico on-chip test) and Raspberry Pi 5 + Hailo vs Jetson Orin Nano benchmark
 4. Engine: low-density (1–2 user) and insider-attack improvements; burst packet loss
-5. Vehicle-to-vehicle messaging over ESP32 (ESP-NOW) and cloud synchronisation (AWS IoT)
-6. Field test: one unit on a fixed bus route, one rotating between volunteer cars
+5. Backend: sign-in and roles, rate limits, signed alerts to phones; move to Supabase and deploy to the cloud
+6. Vehicle-to-vehicle messaging over ESP32 (ESP-NOW)
+7. Field test: one unit on a fixed bus route, one rotating between volunteer cars
 
 ## Credits and licences
 
