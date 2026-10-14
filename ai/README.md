@@ -162,10 +162,11 @@ fine-tunes v2 on Egyptian frames instead of merging more foreign datasets.
 
 ## Step 6: extra public data (v4)
 
-`v4_public_extra` is v3c with three public Kaggle datasets added to training, to see what more public data
-changes: the **Indian Roads Dataset** (marked and unmarked speed breakers, potholes; capped at 3,000 images,
-speed-bump images first), **PotHoleNet** (potholes at night, in rain, evening; 1,500) and **BharatPothole**
-(dashcam potholes; 1,500). Attach them in the Kaggle notebook (*Add Input → Datasets*) with the private
+`v4_public_extra` is v3c with two public Kaggle datasets added to training, to see what more public data
+changes: **PotHoleNet** (potholes at night, in rain, evening; capped at 1,500 images) and **BharatPothole**
+(dashcam potholes; 1,500). The Indian Roads Dataset was dropped after Kaggle failed to mount it (14 Oct); its
+licence is not stated either. A public dataset that cannot be attached is now skipped with a message instead of
+stopping the run. Attach them in the Kaggle notebook (*Add Input → Datasets*) with the private
 `icvsp-egypt-train`; the notebook links them into the merge without copying.
 
 The comparison stays fair: only SBP-YOLO keeps a test split, so the public test set is identical to v3c's, and

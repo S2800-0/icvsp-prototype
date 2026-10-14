@@ -207,11 +207,12 @@ IMGSZ = int(re.search(r'--imgsz (\\d+)', ARGS).group(1)) if '--imgsz' in ARGS el
 EGYPT = EXPERIMENT.startswith(('v3', 'v4', 'espdet'))   # runs that use the private Egyptian data
 # v4: public Kaggle datasets to attach (Add Input -> Datasets -> search the name) -> folder name in the merge
 # (if they are not attached, the notebook fetches them itself with kagglehub; Internet must be on)
-EXTRA_PUBLIC = {'mitangshu11/indian-roads-dataset': 'pub_indian_roads',      # marked + unmarked speed breakers, potholes
-                'aryashah2k/potholenet': 'pub_potholenet',                   # potholes at night, rain, evening (CC BY 4.0)
+# mitangshu11/indian-roads-dataset (pub_indian_roads) was dropped: Kaggle failed to mount it (run of 14 Oct) and its
+# licence is not stated
+EXTRA_PUBLIC = {'aryashah2k/potholenet': 'pub_potholenet',                   # potholes at night, rain, evening (CC BY 4.0)
                 'surbhisaswatimohanty/bharatpothole': 'pub_bharatpothole'}   # dashcam potholes (CC BY-SA 4.0)
 EXTRA = EXPERIMENT.startswith('v4')"""),
-    ('md', '## 0. v4 only, once, in the editor: attach the public datasets\nKaggle attaches new datasets only in an **interactive** session. Run this cell once in the editor (the three datasets then appear under *Input* on the right), then *Save Version → Save & Run All*. In the saved run it only checks that they are attached.'),
+    ('md', '## 0. v4 only, once, in the editor: attach the public datasets\nKaggle attaches new datasets only in an **interactive** session. Run this cell once in the editor (the public datasets then appear under *Input* on the right), then *Save Version → Save & Run All*. In the saved run it only checks that they are attached.'),
     ('code', """if EXPERIMENT.startswith('v4'):
     import kagglehub
     for ref in EXTRA_PUBLIC:
@@ -266,12 +267,16 @@ if EXTRA:
             try:
                 d = pathlib.Path(kagglehub.dataset_download(ref))
             except Exception as e:   # Kaggle only attaches new datasets in an interactive session
-                raise SystemExit(f'{ref} is not attached. Open the notebook in the editor, run the cell '
-                                 '"Attach the public datasets" once (interactive), then Save Version again. ({e})')
+                print(f'SKIPPED {ref}: not attached and could not be downloaded ({e}). To include it, run the cell '
+                      '"Attach the public datasets" once in the editor, then Save Version again.')
+                continue
         n_img = sum(1 for p in d.rglob('*') if p.suffix.lower() in ('.jpg', '.jpeg', '.png'))
         names = [str(p.relative_to(d)) for p in d.rglob('*') if p.name in ('data.yaml', 'classes.txt')][:3]
         print(f'{ref}: {n_img} images in {d}, class files: {names or "none (single-class override in classes.yaml)"}')
-        PUBLIC_DIRS[folder] = d"""),
+        PUBLIC_DIRS[folder] = d
+    if not PUBLIC_DIRS:
+        raise SystemExit('None of the public datasets is available, so v4 would only repeat v3c. Attach at least one.')
+    print('v4 uses:', sorted(PUBLIC_DIRS))"""),
     ('md', '## 4. Download SBP-YOLO, add the Egyptian / night data, merge\nThe data goes to `/tmp` so it is not saved into the output. Class IDs were verified on 29 Sep (0 = pothole, 1 = speed bump). The download is retried automatically if Drive rate-limits it. For v3, the zips from the private `icvsp-egypt-train` dataset are unpacked next to SBP-YOLO; video frames are split by video, never by frame.'),
     ('code', """import subprocess
 for attempt in range(3):
