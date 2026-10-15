@@ -25,6 +25,7 @@ VIDEOS = [  # name, minutes, events file, detection folder prefix
     ('Day (Cairo, held out)', 18, AI / 'data/egypt_test/external/events_cairo_yt_02.csv', 'day'),
 ]
 MODELS = [('YOLO11n v3c (reference)', 'v3c'), ('YOLO11n v4, epoch 80 (+ public Kaggle data)', 'v4last'),
+          ('YOLO11n v5, epoch 80 (curated public data)', 'v5last'),
           ('YOLO11n v4, epoch 1 (saved as best)', 'v4'),
           ('ESPDet-Pico (chip model)', 'espdet224')]
 

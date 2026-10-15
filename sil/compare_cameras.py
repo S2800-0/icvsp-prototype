@@ -12,7 +12,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import run_sil  # noqa: E402
 
-PROFILES = ["none", "espdet", "v3c", "v4"]
+PROFILES = ["none", "espdet", "v3c", "v4", "v5"]
 
 
 def main() -> None:

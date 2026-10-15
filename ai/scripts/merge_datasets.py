@@ -239,7 +239,10 @@ def main():
             rep['videos'] = {'train': sorted(v for v in vids if not val(Path(v + '_0'))),
                              'val': sorted(v for v in vids if val(Path(v + '_0')))}
         else:
-            random.shuffle(rest)
+            # a fresh generator per source: its split must not depend on which other sources are present
+            # (a shared one moved SBP images into validation that v2, the starting point of v4 / v5, had trained
+            # on). Random(seed) reproduces the split of the SBP-only merges v0-v3c, which shuffled SBP first.
+            random.Random(args.seed).shuffle(rest)
             n_val = round(0.15 * len(rest))
             final = [(i, l, 'val') for i, l, _ in rest[:n_val]] + [(i, l, 'train') for i, l, _ in rest[n_val:]]
         final += [x for x in pending if x[2] == 'test']

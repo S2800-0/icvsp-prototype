@@ -62,6 +62,7 @@ CAMERAS = {
     "espdet": {"hit": {"speed_bump": 2 / 8, "pothole": 1 / 8}, "false_per_km": {"speed_bump": 0.50, "pothole": 0.50}},
     "v3c": {"hit": {"speed_bump": 0 / 8, "pothole": 2 / 8}, "false_per_km": {"speed_bump": 0.21, "pothole": 1.71}},
     "v4": {"hit": {"speed_bump": 0 / 8, "pothole": 2 / 8}, "false_per_km": {"speed_bump": 0.00, "pothole": 0.93}},
+    "v5": {"hit": {"speed_bump": 0 / 8, "pothole": 2 / 8}, "false_per_km": {"speed_bump": 0.00, "pothole": 1.22}},
     "none": {"hit": {"speed_bump": 0.0, "pothole": 0.0}, "false_per_km": {"speed_bump": 0.0, "pothole": 0.0}},
 }
 FALSE_JOLT_PER_CAR = 0.05      # honest device, false pothole report (e.g. a manhole cover) per drive
