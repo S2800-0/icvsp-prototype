@@ -27,7 +27,7 @@ VIDEOS = [  # name, minutes, events file, detection folder prefix
 MODELS = [('YOLO11n v3c (reference)', 'v3c'), ('YOLO11n v4, epoch 80 (+ public Kaggle data)', 'v4last'),
           ('YOLO11n v5, epoch 80 (curated public data)', 'v5last'),
           ('YOLO11n v4, epoch 1 (saved as best)', 'v4'),
-          ('ESPDet-Pico (chip model)', 'espdet224')]
+          ('ESPDet-Pico (chip model)', 'espdet224'), ('ESPDet-Pico v5 (chip model, curated data)', 'espdet224v5')]
 
 
 def build():
