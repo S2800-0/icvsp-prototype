@@ -25,14 +25,19 @@
 using namespace icvsp;
 
 int main(int argc, char** argv) {
-    if (argc < 2) { std::fprintf(stderr, "usage: replay_detections detections.csv [--fps 15] [--forward] [--road-mask] [--speed 40]\n"); return 2; }
+    if (argc < 2) { std::fprintf(stderr, "usage: replay_detections detections.csv [--fps 15] [--forward] [--road-mask] [--speed 40] [--pothole-k 2 --pothole-conf 0.5] [--k 3]\n"); return 2; }
     double fps = 15.0, speed = 40.0;
     bool forward = false, road_mask = false;
+    int pothole_k = -1, k_all = 0;          // -1 / < 0: keep the device defaults
+    double pothole_conf = -1.0;
     for (int i = 2; i < argc; ++i) {
         if (!std::strcmp(argv[i], "--fps") && i + 1 < argc) fps = std::atof(argv[++i]);
         else if (!std::strcmp(argv[i], "--speed") && i + 1 < argc) speed = std::atof(argv[++i]);
         else if (!std::strcmp(argv[i], "--forward")) forward = true;
         else if (!std::strcmp(argv[i], "--road-mask")) road_mask = true;
+        else if (!std::strcmp(argv[i], "--pothole-k") && i + 1 < argc) pothole_k = std::atoi(argv[++i]);
+        else if (!std::strcmp(argv[i], "--pothole-conf") && i + 1 < argc) pothole_conf = std::atof(argv[++i]);
+        else if (!std::strcmp(argv[i], "--k") && i + 1 < argc) k_all = std::atoi(argv[++i]);
     }
     std::ifstream in(argv[1]);
     std::string line;
@@ -63,6 +68,9 @@ int main(int argc, char** argv) {
 
     TrackerConfig cfg;
     cfg.rear_camera = !forward;
+    if (pothole_k >= 0) cfg.pothole_k_hits = (uint8_t)pothole_k;   // --pothole-k 0 switches the short rule off
+    if (pothole_conf >= 0) cfg.pothole_min_peak_conf = (float)pothole_conf;
+    if (k_all > 0) cfg.k_hits = (uint8_t)k_all;
     std::printf("clip,t_s,class,conf,x1,y1,x2,y2\n");
     for (auto& [clip, frames] : clips) {
         HazardTracker tr(cfg);

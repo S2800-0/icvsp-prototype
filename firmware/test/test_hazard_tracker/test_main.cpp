@@ -57,10 +57,31 @@ void test_single_frame_flicker_is_not_reported() {
 
 void test_three_of_five_frames_confirms_a_pothole() {
     HazardTracker tr;
-    std::vector<CamDetection> v(5, box(HazardType::Pothole, 0.5f, 0.7f, 0.1f));
+    std::vector<CamDetection> v(5, box(HazardType::Pothole, 0.5f, 0.7f, 0.1f, 0.3f));  // weak boxes
     TEST_ASSERT_EQUAL(0, run(tr, v, {true, false, true, false, false}).size());  // only 2 of 5
     HazardTracker tr2;
     TEST_ASSERT_EQUAL(1, run(tr2, v, {true, false, true, false, true}).size());  // 3 of 5
+}
+
+void test_a_confident_pothole_seen_in_two_frames_is_confirmed() {
+    // potholes pass a forward camera in about 2 frames; a confident box makes 2 of 5 enough
+    HazardTracker tr;
+    std::vector<CamDetection> v(5, box(HazardType::Pothole, 0.5f, 0.7f, 0.1f, 0.6f));
+    TEST_ASSERT_EQUAL(1, run(tr, v, {true, true, false, false, false}).size());
+    TrackerConfig off;
+    off.pothole_k_hits = 0;   // the rule can be switched off: back to 3 of 5
+    HazardTracker tr2(off);
+    TEST_ASSERT_EQUAL(0, run(tr2, v, {true, true, false, false, false}).size());
+}
+
+void test_two_frames_are_not_enough_for_a_speed_bump() {
+    // the short rule is for potholes only: a bump still needs 3 frames and the motion check
+    TrackerConfig fwd;
+    fwd.rear_camera = false;
+    HazardTracker tr(fwd);
+    std::vector<CamDetection> v;
+    for (int f = 0; f < 5; ++f) v.push_back(box(HazardType::SpeedBump, 0.5f, 0.6f + 0.05f * f, 0.2f + 0.02f * f, 0.9f));
+    TEST_ASSERT_EQUAL(0, run(tr, v, {true, true, false, false, false}).size());
 }
 
 void test_static_bump_box_like_a_kerb_is_rejected() {
@@ -143,6 +164,8 @@ int main(int, char**) {
     RUN_TEST(test_receding_bump_is_confirmed_once);
     RUN_TEST(test_single_frame_flicker_is_not_reported);
     RUN_TEST(test_three_of_five_frames_confirms_a_pothole);
+    RUN_TEST(test_a_confident_pothole_seen_in_two_frames_is_confirmed);
+    RUN_TEST(test_two_frames_are_not_enough_for_a_speed_bump);
     RUN_TEST(test_static_bump_box_like_a_kerb_is_rejected);
     RUN_TEST(test_bump_moving_the_wrong_way_is_rejected);
     RUN_TEST(test_forward_camera_expects_the_opposite_motion);

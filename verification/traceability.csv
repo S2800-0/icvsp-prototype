@@ -89,6 +89,8 @@ F-35,Unit,firmware/test/test_hazard_tracker/test_main.cpp,test_low_confidence_bo
 F-36,Unit,firmware/test/test_hazard_tracker/test_main.cpp,test_nothing_is_reported_while_parked,FR-01 NFR-03
 F-37,Unit,firmware/test/test_hazard_tracker/test_main.cpp,test_two_separate_potholes_give_two_reports,FR-01 NFR-03
 F-38,Unit,firmware/test/test_hazard_tracker/test_main.cpp,test_a_gap_longer_than_allowed_starts_a_new_track,FR-01 NFR-03
+F-53,Unit,firmware/test/test_hazard_tracker/test_main.cpp,test_a_confident_pothole_seen_in_two_frames_is_confirmed,FR-01 NFR-03
+F-54,Unit,firmware/test/test_hazard_tracker/test_main.cpp,test_two_frames_are_not_enough_for_a_speed_bump,FR-01 NFR-03
 F-39,Unit,firmware/test/test_replay_guard/test_main.cpp,test_fresh_message_is_accepted_once,FR-06 FR-SEC-10
 F-40,Unit,firmware/test/test_replay_guard/test_main.cpp,test_same_id_from_another_sender_is_a_different_message,FR-06 FR-SEC-10
 F-41,Unit,firmware/test/test_replay_guard/test_main.cpp,test_old_messages_are_stale,FR-06 FR-SEC-10

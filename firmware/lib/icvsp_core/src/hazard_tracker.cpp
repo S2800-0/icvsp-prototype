@@ -46,7 +46,11 @@ bool HazardTracker::moves_like_fixed_object(const Track& tr) const {
 
 bool HazardTracker::confirmed(const Track& tr) const {
     const uint32_t window = cfg_.n_frames >= 32 ? 0xFFFFFFFFu : ((1u << cfg_.n_frames) - 1);
-    if (popcount(tr.hit_frames & window) < cfg_.k_hits) return false;
+    const int hits = popcount(tr.hit_frames & window);
+    // potholes: k_hits frames, or fewer when the track's best box is confident (they pass a forward camera fast)
+    const bool short_pothole = tr.type == HazardType::Pothole && cfg_.pothole_k_hits > 0 &&
+                               hits >= cfg_.pothole_k_hits && tr.max_conf >= cfg_.pothole_min_peak_conf;
+    if (hits < cfg_.k_hits && !short_pothole) return false;
     if (tr.type == HazardType::SpeedBump && !moves_like_fixed_object(tr)) return false;
     return true;
 }

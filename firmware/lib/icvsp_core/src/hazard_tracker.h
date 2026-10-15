@@ -15,7 +15,8 @@ namespace icvsp {
 //      `min_road_frac` (when a road mask is available), or its centre lies in the road region of the
 //      image (below `road_top` of the height; the road is at the bottom for forward and rear cameras);
 //   3. it is linked into a track (same class, centre moved at most `max_jump`, gap at most `max_gap_ms`)
-//      that was detected in at least `k_hits` of the last `n_frames` processed frames;
+//      that was detected in at least `k_hits` of the last `n_frames` processed frames (potholes: also
+//      `pothole_k_hits` frames when the best box reaches `pothole_min_peak_conf`);
 //   4. for speed bumps, the track moves like an object fixed to the road (motion check): with a forward
 //      camera it moves down the image and does not shrink as the car approaches; with a rear camera it
 //      moves up and does not grow as the car drives away. Moved at least `min_drop` image heights in
@@ -50,6 +51,12 @@ struct TrackerConfig {
     float max_jump = 0.12f;
     uint8_t k_hits = 3;
     uint8_t n_frames = 5;
+    // Potholes pass a forward camera in about 2 processed frames, so a pothole track is also confirmed with
+    // pothole_k_hits of the last n_frames when its best box reaches pothole_min_peak_conf (0 = off). Chosen on
+    // the held-out Cairo night video and checked on the day video (firmware/results/pothole_rule.md);
+    // provisional until the team's own recordings.
+    uint8_t pothole_k_hits = 2;
+    float pothole_min_peak_conf = 0.40f;
     float min_drop = 0.03f;
     float min_rate = 0.02f;       // image heights per second
     float min_speed_kmh = 8.0f;

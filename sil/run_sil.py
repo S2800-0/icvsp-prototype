@@ -59,10 +59,14 @@ DETECTION = {
 # Small samples: these are rough rates for comparing models, not accuracy claims. "assumed" is the original setting.
 CAMERAS = {
     "assumed": {"hit": DETECTION["cam"], "false_per_km": {"speed_bump": 0.0, "pothole": 0.0}},
-    "espdet": {"hit": {"speed_bump": 2 / 8, "pothole": 1 / 8}, "false_per_km": {"speed_bump": 0.50, "pothole": 0.50}},
-    "v3c": {"hit": {"speed_bump": 0 / 8, "pothole": 2 / 8}, "false_per_km": {"speed_bump": 0.21, "pothole": 1.71}},
-    "v4": {"hit": {"speed_bump": 0 / 8, "pothole": 2 / 8}, "false_per_km": {"speed_bump": 0.00, "pothole": 0.93}},
-    "v5": {"hit": {"speed_bump": 0 / 8, "pothole": 2 / 8}, "false_per_km": {"speed_bump": 0.00, "pothole": 1.22}},
+    # device logic with the pothole rule (3 of 5, or 2 of 5 with a box >= 0.4; firmware/results/pothole_rule.md)
+    "espdet": {"hit": {"speed_bump": 2 / 8, "pothole": 2 / 8}, "false_per_km": {"speed_bump": 0.50, "pothole": 0.58}},
+    "v3c": {"hit": {"speed_bump": 0 / 8, "pothole": 3 / 8}, "false_per_km": {"speed_bump": 0.21, "pothole": 1.92}},
+    "v4": {"hit": {"speed_bump": 0 / 8, "pothole": 3 / 8}, "false_per_km": {"speed_bump": 0.00, "pothole": 1.42}},
+    "v5": {"hit": {"speed_bump": 0 / 8, "pothole": 5 / 8}, "false_per_km": {"speed_bump": 0.00, "pothole": 1.72}},
+    # before the pothole rule (3 of 5 for every hazard), kept for comparison
+    "espdet_3of5": {"hit": {"speed_bump": 2 / 8, "pothole": 1 / 8}, "false_per_km": {"speed_bump": 0.50, "pothole": 0.50}},
+    "v5_3of5": {"hit": {"speed_bump": 0 / 8, "pothole": 2 / 8}, "false_per_km": {"speed_bump": 0.00, "pothole": 1.22}},
     "none": {"hit": {"speed_bump": 0.0, "pothole": 0.0}, "false_per_km": {"speed_bump": 0.0, "pothole": 0.0}},
 }
 FALSE_JOLT_PER_CAR = 0.05      # honest device, false pothole report (e.g. a manhole cover) per drive
