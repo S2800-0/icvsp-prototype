@@ -53,6 +53,17 @@ DETECTION = {
     "imu": {"speed_bump": 0.95, "pothole": 0.6},    # a wheel can miss a pothole; every wheel rolls over a bump
     "cam": {"speed_bump": 0.4, "pothole": 0.17},
 }
+# Camera profiles: hit rate per passing car and false reports per km AFTER the device logic, measured on the
+# held-out Cairo videos (firmware/results/logic_accuracy.md, night + day pooled: 8 bumps, 8 potholes, 28 min).
+# False reports per minute of video are converted to per km assuming about 30 km/h city driving (0.5 km/min).
+# Small samples: these are rough rates for comparing models, not accuracy claims. "assumed" is the original setting.
+CAMERAS = {
+    "assumed": {"hit": DETECTION["cam"], "false_per_km": {"speed_bump": 0.0, "pothole": 0.0}},
+    "espdet": {"hit": {"speed_bump": 2 / 8, "pothole": 1 / 8}, "false_per_km": {"speed_bump": 0.50, "pothole": 0.50}},
+    "v3c": {"hit": {"speed_bump": 0 / 8, "pothole": 2 / 8}, "false_per_km": {"speed_bump": 0.21, "pothole": 1.71}},
+    "v4": {"hit": {"speed_bump": 0 / 8, "pothole": 2 / 8}, "false_per_km": {"speed_bump": 0.00, "pothole": 0.93}},
+    "none": {"hit": {"speed_bump": 0.0, "pothole": 0.0}, "false_per_km": {"speed_bump": 0.0, "pothole": 0.0}},
+}
 FALSE_JOLT_PER_CAR = 0.05      # honest device, false pothole report (e.g. a manhole cover) per drive
 FALSE_BOX_PER_KM = 0.5         # static false camera boxes (kerb, shadow); the device logic should reject them
 WARN_CHECK_M = 300.0           # a vehicle asks for hazards when it is this far before each hazard
@@ -145,7 +156,8 @@ class Vehicle:
         return res
 
 
-def plan(scn: Scenario, rng: random.Random) -> tuple[list[Vehicle], list[Vehicle]]:
+def plan(scn: Scenario, rng: random.Random, camera: str = "assumed") -> tuple[list[Vehicle], list[Vehicle]]:
+    cam = CAMERAS[camera]
     honest, attackers = [], []
     for k in range(scn.cars):
         d = rng.choice("EW")
@@ -159,12 +171,16 @@ def plan(scn: Scenario, rng: random.Random) -> tuple[list[Vehicle], list[Vehicle
             if rng.random() < DETECTION["imu"][typ]:
                 size = rng.uniform(3.0, 5.0) if typ == "speed_bump" else rng.uniform(6.0, 10.0)
                 car.script.append(f"imu {typ} {t:.3f} {size:.2f}")
-            if rng.random() < DETECTION["cam"][typ]:
+            if rng.random() < cam["hit"][typ]:
                 car.script.append(f"cam {typ} {t + 0.6:.3f} {rng.uniform(0.45, 0.75):.2f}")
         if rng.random() < FALSE_JOLT_PER_CAR:
             car.script.append(f"imu pothole {rng.uniform(20, ROAD_M / car.v - 20):.3f} {rng.uniform(6, 9):.2f}")
         for _ in range(int(rng.random() < FALSE_BOX_PER_KM * ROAD_M / 1000)):
             car.script.append(f"falsecam speed_bump {rng.uniform(5, ROAD_M / car.v - 5):.3f} 0.5")
+        for typ, per_km in cam["false_per_km"].items():   # false camera reports that pass the device logic
+            if per_km > 0:
+                for _ in range(int(per_km * ROAD_M / 1000 + rng.random())):
+                    car.script.append(f"cam {typ} {rng.uniform(5, ROAD_M / car.v - 5):.3f} {rng.uniform(0.45, 0.75):.2f}")
         if rng.random() < scn.faults.gps_loss_cars and car.truth:
             t = car.truth[0][1] - car.start
             car.gps_loss = (max(0.0, t - 5), t + 5)
@@ -196,9 +212,9 @@ class Run:
     events: list[tuple]
 
 
-def prepare(scn: Scenario, seed: int, utc0: float = UTC0) -> Run:
+def prepare(scn: Scenario, seed: int, utc0: float = UTC0, camera: str = "assumed") -> Run:
     rng = random.Random(seed)
-    honest, attackers = plan(scn, rng)
+    honest, attackers = plan(scn, rng, camera)
 
     vetted = set(rng.sample([c.vid for c in honest], int(scn.vetted * len(honest))))
     # devices are registered with the public key the device code derived from its seed (seen in its reports)
@@ -312,23 +328,23 @@ def apply(client, run: Run, t_rel: float, kind: str, payload, results: dict, que
         hlat, hlon = position("E", pos)
         match = [h for h in hz if h["type"] == typ and _dist(h, hlat, hlon) <= MATCH_M]
         real_pos = [(rt, position("E", rp)) for rt, rp, rl in HAZARDS if rl == car.direction]
-        false_warn = [h for h in hz if h["level"] == "warning" and not any(
-            h["type"] == rt and _dist(h, *rp) <= MATCH_M for rt, rp in real_pos)]
+        false_alert = [h for h in hz if not any(h["type"] == rt and _dist(h, *rp) <= MATCH_M for rt, rp in real_pos)]
+        false_warn = [h for h in false_alert if h["level"] == "warning"]
         level = "warning" if any(h["level"] == "warning" for h in match) else (
             "advisory" if match else "none")
         q = {"t": t_rel, "car": car.vid, "hazard": i, "fake": i >= len(HAZARDS), "level": level,
-             "false_warnings": len(false_warn)}
+             "false_warnings": len(false_warn), "false_alerts": len(false_alert)}
         queries.append(q)
         return {"t": t_rel, "kind": "query", "device": car.vid, "type": typ, "fake": q["fake"], "level": level,
                 "result": f"{WARN_CHECK_M:.0f} m before {'an invented' if q['fake'] else 'a real'} {typ}: {level}"}
     return None
 
 
-def simulate(scn: Scenario, seed: int) -> dict:
+def simulate(scn: Scenario, seed: int, camera: str = "assumed") -> dict:
     clock = [UTC0]
     store = Store()
     client = TestClient(create_app(store, lambda: clock[0], admin_token="sil"))
-    run = prepare(scn, seed)
+    run = prepare(scn, seed, camera=camera)
     results, queries = new_results(), []
     for t_rel, kind, payload in run.events:
         clock[0] = UTC0 + t_rel
@@ -369,6 +385,7 @@ def summarise(scn, honest, attackers, results, queries, lat_dev, store) -> dict:
         "warned_real_after_10min": share(late, "warning"),
         "warned_fake": share(fake, "warning"), "advisory_fake": share(fake, "advisory"),
         "queries_with_false_warning": sum(q["false_warnings"] > 0 for q in queries) / len(queries),
+        "queries_with_false_advisory_or_warning": sum(q["false_alerts"] > 0 for q in queries) / len(queries),
         "device_delay_median_s": p(lat_dev, 0.5), "device_delay_p95_s": p(lat_dev, 0.95),
         "reliability_honest_mean": sum((g + 1) / (g + b + 4) for v, (g, b) in reps.items()
                                        if v.startswith("car-")) / max(1, len(honest)),
@@ -412,6 +429,8 @@ def main() -> None:
     ap.add_argument("--cars", type=int)
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--out", default=str(ROOT / "sil" / "results"))
+    ap.add_argument("--camera", choices=list(CAMERAS), default="assumed",
+                    help="camera model profile (hit and false-report rates measured on held-out video)")
     a = ap.parse_args()
     build()
     names = list(SCENARIOS) if a.scenario == "all" else [a.scenario]
@@ -421,7 +440,7 @@ def main() -> None:
         if a.cars:
             scn.cars = a.cars
         print(f"running {n} ...", flush=True)
-        rows.append(simulate(scn, a.seed))
+        rows.append(simulate(scn, a.seed, a.camera))
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
     (out / "summary.json").write_text(json.dumps(rows, indent=1))

@@ -26,6 +26,15 @@ Replacing the assumptions with measured values (phone recordings now, the board 
 
 Results: [`results/summary.md`](results/summary.md).
 
+## Which camera model helps the system most
+
+```bash
+python3 sil/compare_cameras.py                 # same scenarios with each camera model's measured rates
+```
+
+Each camera model's hit rate and false-report rate after the device logic, measured on the held-out Cairo videos,
+is plugged into the simulation (`CAMERAS` in `run_sil.py`). Results: [`results/camera_comparison.md`](results/camera_comparison.md).
+
 ## Live demo with the dashboard
 
 ```bash
