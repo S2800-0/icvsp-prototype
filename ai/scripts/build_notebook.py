@@ -326,7 +326,12 @@ if RESUME_FROM:
 else:
     !python scripts/train.py --data /tmp/merged/data.yaml --device 0 {ARGS} --name {EXPERIMENT}"""),
     ('md', '## 6. Evaluate on the public test set'),
-    ('code', '!python scripts/evaluate.py --weights runs/{EXPERIMENT}/weights/best.pt --device 0 --imgsz {IMGSZ} --public-data /tmp/merged/data.yaml'),
+    ('code', '!python scripts/evaluate.py --weights runs/{EXPERIMENT}/weights/best.pt --device 0 --imgsz {IMGSZ} --public-data /tmp/merged/data.yaml\n'
+             '# best.pt is the epoch with the highest mAP50-95 on validation; when fine-tuning on new data that can be\n'
+             '# epoch 1 (v4 on 15 Oct), so the last epoch is scored on the public test too and both are kept\n'
+             'from ultralytics import YOLO\n'
+             'm = YOLO(f"runs/{EXPERIMENT}/weights/last.pt").val(data="/tmp/merged/data.yaml", split="test", imgsz=IMGSZ, device=0, plots=False)\n'
+             'print("last.pt public test mAP50:", round(m.box.map50, 3), "per class:", [round(x, 3) for x in m.box.ap50])'),
     ('md', '## 7. Package the results\n`icvsp_results.zip` appears in the version\'s **Output** tab. Download it, unzip into `ICVSP/ai/`, and run `python scripts/compare_runs.py` to add the run to the experiment log.'),
     ('code', f"!cd {KW} && zip -qr /kaggle/working/icvsp_results.zip runs && ls -lh /kaggle/working/icvsp_results.zip"),
 ]

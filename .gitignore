@@ -28,6 +28,7 @@ ai/data/batch3_hand_drawn.txt
 # trained partly on private YouTube frames: kept local, not redistributed
 ai/models/v3_egypt_night.pt
 ai/models/v3b_egypt_night.pt
+ai/models/v4_*.pt
 ai/models/v3c_kerbs.pt
 
 # third-party model code fetched by scripts/espdet_support.py (AGPL-3.0, Espressif)
