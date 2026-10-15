@@ -16,9 +16,9 @@ MAX_LINE = 2048
 
 
 class Rejected(Exception):
-    def __init__(self, status: int, reason: str):
+    def __init__(self, status: int, reason: str, retry_after: float | None = None):
         super().__init__(reason)
-        self.status, self.reason = status, reason
+        self.status, self.reason, self.retry_after = status, reason, retry_after
 
 
 @dataclass

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from typing import Callable
 
 from icvsp.config import Config
 from icvsp.consensus import Decision, Engine
@@ -38,8 +39,9 @@ class Service:
             raise Rejected(409, "device already registered") from None
 
     # ---------- reports ----------
-    def submit(self, raw: bytes, now: float) -> dict:
-        """Returns {"status": "accepted" | "duplicate", ...} or raises Rejected."""
+    def submit(self, raw: bytes, now: float, limit: Callable[[str], float | None] | None = None) -> dict:
+        """Returns {"status": "accepted" | "duplicate", ...} or raises Rejected. `limit(device_id)` is the per-device
+        rate limit (FR-SEC-20); it is checked only after the signature, so a forged sender cannot use it up."""
         env: Envelope | None = None
         try:
             env = parse(raw)
@@ -49,6 +51,8 @@ class Service:
             if dev["status"] != "ACTIVE":
                 raise Rejected(403, "device revoked")
             verify_signature(env, dev["public_key"])
+            if limit is not None and (wait := limit(env.sender)) is not None:
+                raise Rejected(429, "rate limit: too many reports from this device", retry_after=wait)
             ev = env.event
             errs = schema_errors(ev)
             if errs:

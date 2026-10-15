@@ -354,7 +354,8 @@ def apply(client, run: Run, t_rel: float, kind: str, payload, results: dict, que
 def simulate(scn: Scenario, seed: int, camera: str = "assumed") -> dict:
     clock = [UTC0]
     store = Store()
-    client = TestClient(create_app(store, lambda: clock[0], admin_token="sil", jwt_secret=JWT))
+    client = TestClient(create_app(store, lambda: clock[0], admin_token="sil", jwt_secret=JWT,
+                                    rate_limits={"reports_ip": None}))   # all simulated phones share one address
     run = prepare(scn, seed, camera=camera)
     results, queries = new_results(), []
     for t_rel, kind, payload in run.events:

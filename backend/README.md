@@ -6,7 +6,7 @@ engine (`engine/`) and answers "which hazards are ahead of me?". FastAPI + SQLit
 
 ```bash
 cd backend
-python3 -m unittest -v                                          # 39 tests: API, sign-in and roles
+python3 -m unittest -v                                          # 48 tests: API, sign-in and roles, rate limits
 ICVSP_ADMIN_TOKEN=dev SUPABASE_JWT_SECRET=<project JWT secret> uvicorn --factory icvsp_backend.app:create_app --reload
 # interactive API docs: http://127.0.0.1:8000/docs
 # operator dashboard:   http://127.0.0.1:8000/dashboard (asks for the admin token)
@@ -43,5 +43,23 @@ No or invalid token: 401. Valid token, wrong role: 403. Ambulance has the same r
 security team decides otherwise. Every failure is logged on the `icvsp.security` logger (time, status, reason,
 endpoint, client address), never the token, signature or password.
 
-**Not done yet** (security V-cycle): signed backend → phone alerts (FR-SEC-15–17); rate limits (FR-SEC-20); TLS
+## Rate limits (FR-SEC-20)
+
+`ratelimit.py`: a token bucket per key; over the limit the API answers **429** with `Retry-After`, and the event is
+logged (`icvsp.security` logger; refused reports also go to the `rejections` table).
+
+| Limit | Key | Default (per minute / burst) |
+|---|---|---|
+| `reports_ip` | caller address, before any check | 120 / 60 |
+| `reports_device` | device, counted only after the signature is verified (a forged sender cannot use it up) | 30 / 20 |
+| `beacons_user`, `hazards_user` | signed-in user | 30 / 20, 60 / 20 |
+| `auth_fail_ip` | caller address, failed sign-ins | 10 / 10 |
+| `admin` | administrator | 120 / 60 |
+
+Change any limit without code: `ICVSP_RATE_REPORTS_DEVICE=30/10`, or `ICVSP_RATE_REPORTS_IP=off`. The buckets are in
+memory (one server); several servers need a shared store or limits at the gateway. In the system simulation all phones
+share one address, so only `reports_ip` is off there; no simulated request is limited, including the upload burst after
+a 10-minute internet outage.
+
+**Not done yet** (security V-cycle): signed backend → phone alerts (FR-SEC-15–17); TLS
 comes from the hosting platform (FR-SEC-08). Reputation is updated by `POST /admin/settle`, to be run on a schedule.

@@ -155,6 +155,15 @@ B-36,Integration,backend/tests/test_auth.py,OwnVehicle.test_own_vehicle_is_store
 B-37,Integration,backend/tests/test_auth.py,OwnVehicle.test_user_without_a_vehicle_cannot_send_positions,FR-SEC-02
 B-38,Integration,backend/tests/test_auth.py,Logging.test_failed_sign_in_is_logged_without_the_token,FR-SEC-21
 B-39,Integration,backend/tests/test_auth.py,Logging.test_wrong_role_and_missing_token_are_logged_with_a_reason,FR-SEC-21
+B-40,Integration,backend/tests/test_ratelimit.py,Bucket.test_burst_then_steady_rate,FR-SEC-20
+B-41,Integration,backend/tests/test_ratelimit.py,Bucket.test_limits_are_configurable_from_the_environment,FR-SEC-20
+B-42,Integration,backend/tests/test_ratelimit.py,Api.test_device_flooding_reports_gets_429_with_retry_after,FR-SEC-20
+B-43,Integration,backend/tests/test_ratelimit.py,Api.test_forged_reports_do_not_use_up_a_real_devices_allowance,FR-SEC-20 FR-SEC-07
+B-44,Integration,backend/tests/test_ratelimit.py,Api.test_rate_limited_report_is_logged_with_its_reason,FR-SEC-20 FR-SEC-21
+B-45,Integration,backend/tests/test_ratelimit.py,Api.test_one_user_flooding_hazard_queries_gets_429_others_do_not,FR-SEC-20 FR-SEC-19
+B-46,Integration,backend/tests/test_ratelimit.py,Api.test_one_user_flooding_positions_gets_429,FR-SEC-20
+B-47,Integration,backend/tests/test_ratelimit.py,Api.test_repeated_failed_sign_ins_are_slowed_down,FR-SEC-20 FR-SEC-01
+B-48,Integration,backend/tests/test_ratelimit.py,Api.test_unsigned_junk_flood_is_stopped_by_address,FR-SEC-20
 S-01,System,sil/test_sil.py,WholeChain.test_real_hazards_produce_warnings_for_following_cars,FR-15 FR-16
 S-02,System,sil/test_sil.py,WholeChain.test_invented_hazards_never_reach_warning_level,NFR-03 NFR-05 FR-11
 S-03,System,sil/test_sil.py,WholeChain.test_tampered_unknown_and_revoked_reports_are_refused,FR-SEC-03 FR-SEC-07 FR-SEC-12

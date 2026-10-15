@@ -55,6 +55,10 @@ def _b64(part: str) -> bytes:
     return base64.urlsafe_b64decode(part + "=" * (-len(part) % 4))
 
 
+def _client(request: Request) -> str:
+    return request.client.host if request.client else "-"
+
+
 def decode_token(token: str, secret: str, now: float, audience: str | None = DEFAULT_AUDIENCE) -> dict:
     """Return the claims of a valid HS256 token. Raises AuthError with a short, secret-free reason."""
     if not secret:
@@ -102,7 +106,8 @@ def principal_from_claims(claims: dict) -> Principal:
 
 class Auth:
     def __init__(self, secret: str | None = None, admin_token: str | None = None,
-                 clock: Callable[[], float] = time.time, audience: str | None = None):
+                 clock: Callable[[], float] = time.time, audience: str | None = None, limiter=None):
+        self.limiter = limiter          # rate limits (ratelimit.py): failed sign-ins per address
         self.secret = secret if secret is not None else os.environ.get("SUPABASE_JWT_SECRET", "")
         self.admin_token = admin_token if admin_token is not None else os.environ.get("ICVSP_ADMIN_TOKEN", "")
         self.audience = audience if audience is not None else os.environ.get("SUPABASE_JWT_AUDIENCE", DEFAULT_AUDIENCE)
@@ -116,6 +121,8 @@ class Auth:
 
     def deny(self, request: Request, status: int, reason: str):
         self.audit(request, reason, status)
+        if self.limiter is not None and status in (401, 403):   # count failed sign-ins per address
+            self.limiter.hit("auth_fail_ip", _client(request))
         headers = {"WWW-Authenticate": "Bearer"} if status == 401 else None
         raise HTTPException(status, reason, headers=headers)
 
@@ -126,6 +133,9 @@ class Auth:
 
         def dependency(request: Request,
                        creds: HTTPAuthorizationCredentials | None = Depends(_bearer)) -> Principal:
+            if self.limiter is not None and (wait := self.limiter.blocked("auth_fail_ip", _client(request))):
+                self.audit(request, "too many failed sign-ins", 429)
+                raise HTTPException(429, "too many failed sign-ins", headers={"Retry-After": str(int(wait) + 1)})
             legacy = request.headers.get("x-admin-token")
             if admin_token_ok and legacy is not None and not (creds and creds.credentials):
                 if self.admin_token and hmac.compare_digest(legacy.encode(), self.admin_token.encode()):
