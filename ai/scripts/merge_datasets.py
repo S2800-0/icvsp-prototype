@@ -47,10 +47,10 @@ def load_scheme():
     return names, rules, re.compile(cfg['exclude'], re.I)
 
 
-def source_names(src: Path):
+def source_names(src: Path, src_cfg: dict):
     if src.name.lower().startswith('background'):
         return []
-    override = (yaml.safe_load((ROOT / 'configs/classes.yaml').read_text()).get('sources') or {}).get(src.name)
+    override = src_cfg.get(src.name)
     if override and 'names' in override:
         return list(override['names'])
     for y in list(src.rglob('data.yaml')) + list(src.rglob('*.yaml')):
@@ -132,6 +132,7 @@ def main():
     ap.add_argument('--raw', default=ROOT / 'data/raw', type=Path)
     ap.add_argument('--out', default=ROOT / 'data/merged', type=Path)
     ap.add_argument('--seed', default=0, type=int)
+    ap.add_argument('--profile', default='', help='a named set of per-source overrides under `profiles` in classes.yaml')
     args = ap.parse_args()
     random.seed(args.seed)
     names, rules, exclude = load_scheme()
@@ -146,7 +147,10 @@ def main():
         (args.out / s / 'labels').mkdir(parents=True)
 
     test_rx = re.compile(cfg.get('test_sources', '^sbp_yolo$'), re.I)
-    src_cfg = cfg.get('sources') or {}
+    src_cfg = {k: dict(v or {}) for k, v in (cfg.get('sources') or {}).items()}
+    if args.profile:   # e.g. v5: keep only some images of a source
+        for k, v in (cfg.get('profiles') or {})[args.profile].items():
+            src_cfg.setdefault(k, {}).update(v or {})
     sources = sorted(p for p in args.raw.iterdir() if p.is_dir())
     images = {src: sorted(p for p in src.rglob('*') if p.suffix.lower() in IMG_EXT) for src in sources}
 
@@ -169,7 +173,9 @@ def main():
     counts = defaultdict(Counter)
 
     for src in sources:
-        src_names = source_names(src)
+        src_names = source_names(src, src_cfg)
+        only = set((src_cfg.get(src.name) or {}).get('only_images_with', []))   # source class names
+        skip = set((src_cfg.get(src.name) or {}).get('skip_images_with', []))
         cmap = build_map(src_names, rules, exclude)
         imgs = images[src]
         keeps_test = bool(test_rx.search(src.name))
@@ -194,19 +200,23 @@ def main():
                 # identical, but counted so the overlap is known
                 report.setdefault('near_test_within_test_source', 0)
                 report['near_test_within_test_source'] += 1
-            seen[h] = img
             lab = label_for(img)
-            lines = []
+            lines, present = [], set()
             if lab:
                 for ln in lab.read_text().splitlines():
                     f = ln.split()
                     if len(f) < 5:
                         continue
                     cid = int(float(f[0]))
+                    present.add(src_names[cid] if cid < len(src_names) else str(cid))
                     if cid in cmap:
                         lines.append(' '.join([str(cmap[cid])] + yolo_box(f[1:])))
                     else:
                         rep['dropped_boxes'] += 1
+            if (only and not present & only) or (skip and present & skip):
+                rep['filtered_images'] = rep.get('filtered_images', 0) + 1
+                continue
+            seen[h] = img
             pending.append((img, lines, split_of(img) if keeps_test else 'train'))
 
         cap = (src_cfg.get(src.name) or {}).get('max_images')

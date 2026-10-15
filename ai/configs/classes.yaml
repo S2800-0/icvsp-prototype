@@ -36,6 +36,17 @@ sources:
     names: [pothole]
     max_images: 1500
 
+# Named sets of per-source overrides, chosen with merge_datasets.py --profile NAME.
+# v5 (15 Oct): checked per source, the public sets disagree on what a pothole is. Indian Roads potholes are
+# ground-level photos of rough patches (not a vehicle camera's view) and BharatPothole labels many tiny, shallow
+# marks (below the warning scope, FR-27), so v5 keeps only Indian Roads images with speed bumps and no pothole
+# boxes, and leaves BharatPothole out (not attached). PotHoleNet (dashcam, consistent) stays as in v4.
+profiles:
+  v5:
+    pub_indian_roads:
+      only_images_with: [speed_bump]
+      skip_images_with: [pothole]
+
 # Only these sources keep their own test split; every other source goes to train/val, so the public test set
 # is identical for every experiment.
 test_sources: '^sbp_yolo$'

@@ -160,6 +160,12 @@ fine-tunes v2 on Egyptian frames instead of merging more foreign datasets.
    its `detections.csv` in `tools/review.html` (*Video* tab) to see where the boxes really are; the same
    page records timestamps (**B** bump, **H** pothole, **D** dip while watching) and exports `events.csv`.
 
+## Labelling rules
+
+Everyone labelling data, and every decision to use a public dataset, follows [`LABELLING_POLICY.md`](LABELLING_POLICY.md):
+vehicle-camera view only, hazards big enough to make a driver stop, slow down or swerve, no unboxed hazards in kept
+frames, splits by video.
+
 ## Step 6: extra public data (v4)
 
 `v4_public_extra` is v3c with three public Kaggle datasets added to training, to see what more public data
@@ -186,3 +192,13 @@ public-test scores of every model look better than they are; the held-out Egypti
 - YouTube driving videos: used privately to test the approach, not redistributed; not part of any
   published dataset or paper figure. For the paper, the team's own recordings replace them.
 - Blur faces and number plates before publishing any Egyptian images (Egypt PDPL, Law 151/2020).
+
+## Step 7: curated public data (v5)
+
+Checked one source at a time, the v4 datasets disagree on what a pothole is: Indian Roads potholes are ground-level
+photos of rough patches, and BharatPothole labels many tiny, shallow marks (v4 reaches only 0.19 mAP50 on its own
+validation images). `v5_curated` keeps the v4 recipe with curated data: PotHoleNet, and Indian Roads images with speed
+bumps only (merge profile `v5` in `configs/classes.yaml`); BharatPothole is left out. `espdet_pico_224_v5` trains the
+chip model on the same data. Attach `icvsp-egypt-train`, `indian-roads-dataset` and `potholenet`, set `EXPERIMENT`, and
+Save & Run All. Judge v5 by the last epoch's public test score and by the held-out Cairo video with the device logic
+(`firmware/tools/score_logic.py`), not by `best.pt` alone.
