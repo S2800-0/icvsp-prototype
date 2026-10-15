@@ -123,7 +123,7 @@ class Demo:
         self.injected = 0
         self.lock = threading.Lock()
         self.store = Store()
-        self.app = create_app(self.store, self.clock, admin_token=self.token)
+        self.app = create_app(self.store, self.clock, admin_token=self.token, jwt_secret=run_sil.JWT)
         self._routes()
 
     # ---------- demo-only routes, added to the normal backend app ----------
@@ -225,7 +225,7 @@ class Demo:
                     lat, lon = position("E", max(0.0, at_m - 12.5 * (20 - k)))
                     rows.append({"vehicle_id": vid, "t": now - 20 + k, "lat": lat, "lon": lon, "speed_mps": 12.5,
                                  "heading_deg": 90})
-                c.post("/beacons", json=rows)
+                c.post("/beacons", json=rows, headers=run_sil.user(vid))
 
             if kind in ("replay", "tamper"):
                 if not self.accepted_lines:

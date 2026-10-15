@@ -32,12 +32,18 @@ sys.path.insert(0, str(ROOT / "backend"))
 from fastapi.testclient import TestClient  # noqa: E402
 
 from icvsp_backend.app import create_app  # noqa: E402
+from icvsp_backend.auth import issue_dev_token  # noqa: E402
 from icvsp_backend.store import Store  # noqa: E402
 from icvsp.model import from_iso  # noqa: E402
 
 FW = ROOT / "firmware"
 BIN = FW / ".pio" / "sil_vehicle"
 ADMIN = {"X-Admin-Token": "sil"}
+JWT = "sil-only-secret"                # each car's phone is a signed-in driver (sign-in and roles)
+
+
+def user(vehicle_id: str) -> dict:
+    return {"Authorization": "Bearer " + issue_dev_token(JWT, f"user-{vehicle_id}", "driver", vehicle_id)}
 
 LAT0, LON0 = 30.0444, 31.2357          # west end of the simulated road (Cairo)
 ROAD_M = 3000.0
@@ -315,7 +321,7 @@ def apply(client, run: Run, t_rel: float, kind: str, payload, results: dict, que
         results["lost"] += 1
         return {"t": t_rel, "kind": "lost", "device": payload, "result": "report lost on the BLE link"}
     elif kind == "beacons":
-        client.post("/beacons", json=payload)
+        client.post("/beacons", json=payload, headers=user(payload[0]["vehicle_id"]))
     elif kind == "revoke":
         client.post(f"/devices/{payload}/revoke", headers=ADMIN)
         return {"t": t_rel, "kind": "revoke", "device": payload, "result": "device revoked by the administrator"}
@@ -328,7 +334,7 @@ def apply(client, run: Run, t_rel: float, kind: str, payload, results: dict, que
         car, i = payload
         typ, pos, lane = (HAZARDS + run.fakes)[i]
         lat, lon = position(car.direction, car.travelled(pos) - WARN_CHECK_M)
-        hz = client.get("/hazards", params={"lat": lat, "lon": lon, "radius_m": WARN_CHECK_M + 50,
+        hz = client.get("/hazards", headers=user(car.vid), params={"lat": lat, "lon": lon, "radius_m": WARN_CHECK_M + 50,
                                             "heading_deg": 90 if car.direction == "E" else 270}).json()
         hlat, hlon = position("E", pos)
         match = [h for h in hz if h["type"] == typ and _dist(h, hlat, hlon) <= MATCH_M]
@@ -348,7 +354,7 @@ def apply(client, run: Run, t_rel: float, kind: str, payload, results: dict, que
 def simulate(scn: Scenario, seed: int, camera: str = "assumed") -> dict:
     clock = [UTC0]
     store = Store()
-    client = TestClient(create_app(store, lambda: clock[0], admin_token="sil"))
+    client = TestClient(create_app(store, lambda: clock[0], admin_token="sil", jwt_secret=JWT))
     run = prepare(scn, seed, camera=camera)
     results, queries = new_results(), []
     for t_rel, kind, payload in run.events:

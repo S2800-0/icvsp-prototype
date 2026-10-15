@@ -6,8 +6,8 @@ engine (`engine/`) and answers "which hazards are ahead of me?". FastAPI + SQLit
 
 ```bash
 cd backend
-python3 -m unittest -v                                          # 21 API tests
-ICVSP_ADMIN_TOKEN=dev uvicorn --factory icvsp_backend.app:create_app --reload
+python3 -m unittest -v                                          # 39 tests: API, sign-in and roles
+ICVSP_ADMIN_TOKEN=dev SUPABASE_JWT_SECRET=<project JWT secret> uvicorn --factory icvsp_backend.app:create_app --reload
 # interactive API docs: http://127.0.0.1:8000/docs
 # operator dashboard:   http://127.0.0.1:8000/dashboard (asks for the admin token)
 ```
@@ -24,6 +24,24 @@ ICVSP_ADMIN_TOKEN=dev uvicorn --factory icvsp_backend.app:create_app --reload
 
 Every refused report is logged with its reason (`rejections` table).
 
-**Not done yet** (security V-cycle): user sign-in and roles (FR-SEC-01/02), so beacons are not yet tied to a
-signed-in phone; signed backend → phone alerts (FR-SEC-15–17); rate limits (FR-SEC-20); TLS comes from the
-hosting platform (FR-SEC-08). Reputation is updated by `POST /admin/settle`, to be run on a schedule.
+## Sign-in and roles (FR-SEC-01/02/19/21, NFR-SEC-02)
+
+The app signs in with Supabase Auth and sends `Authorization: Bearer <access token>`. `auth.py` checks the
+token (HS256 JWT: signature, expiry, audience) and reads the role and vehicle from `app_metadata`:
+`{"role": "driver" | "ambulance" | "admin", "vehicle_id": "<device id>"}`. `app_metadata` is used because only an
+admin can change it (a user can edit `user_metadata`). The secret comes from `SUPABASE_JWT_SECRET`
+(optional `SUPABASE_JWT_AUDIENCE`, default `authenticated`); with no secret set, every token is refused.
+
+| Endpoint | Who |
+|---|---|
+| `GET /health`, `POST /reports` | anyone (reports are checked by the device signature) |
+| `POST /beacons` | Driver or Ambulance, only for the vehicle in their token (otherwise 403) |
+| `GET /hazards` | Driver or Ambulance |
+| `POST /devices`, `POST /devices/{id}/revoke`, `GET /admin/overview`, `POST /admin/settle` | Administrator (Bearer token, or the legacy `X-Admin-Token` header, kept for the simulation and demo) |
+
+No or invalid token: 401. Valid token, wrong role: 403. Ambulance has the same rights as Driver until the
+security team decides otherwise. Every failure is logged on the `icvsp.security` logger (time, status, reason,
+endpoint, client address), never the token, signature or password.
+
+**Not done yet** (security V-cycle): signed backend → phone alerts (FR-SEC-15–17); rate limits (FR-SEC-20); TLS
+comes from the hosting platform (FR-SEC-08). Reputation is updated by `POST /admin/settle`, to be run on a schedule.

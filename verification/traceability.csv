@@ -137,6 +137,24 @@ B-18,Integration,backend/tests/test_api.py,Hazards.test_settle_rewards_confirmed
 B-19,Integration,backend/tests/test_api.py,Reports.test_retry_with_a_different_line_ending_is_still_a_duplicate,FR-06 FR-SEC-10
 B-20,Integration,backend/tests/test_api.py,Hazards.test_overview_shows_decisions_reliability_positions_and_rejections,FR-12 FR-SEC-21
 B-21,Integration,backend/tests/test_api.py,Hazards.test_minor_hazard_is_not_shown_and_severity_is_reported,FR-27 FR-16
+B-22,Integration,backend/tests/test_auth.py,SignIn.test_no_token_gives_401_on_protected_endpoints,FR-SEC-01 FR-SEC-19
+B-23,Integration,backend/tests/test_auth.py,SignIn.test_invalid_token_gives_401,FR-SEC-01 FR-SEC-19
+B-24,Integration,backend/tests/test_auth.py,SignIn.test_expired_token_gives_401,FR-SEC-01 FR-SEC-19
+B-25,Integration,backend/tests/test_auth.py,SignIn.test_no_secret_configured_refuses_every_token,FR-SEC-01 NFR-SEC-02
+B-26,Integration,backend/tests/test_auth.py,SignIn.test_secret_is_read_from_the_environment,FR-SEC-01 NFR-SEC-02
+B-27,Integration,backend/tests/test_auth.py,SignIn.test_health_and_reports_do_not_need_a_user_token,FR-SEC-01 FR-SEC-19
+B-28,Integration,backend/tests/test_auth.py,Roles.test_driver_gets_403_on_administrator_endpoints,FR-SEC-02 FR-SEC-19
+B-29,Integration,backend/tests/test_auth.py,Roles.test_driver_and_ambulance_can_use_beacons_and_hazards,FR-SEC-02 FR-SEC-19
+B-30,Integration,backend/tests/test_auth.py,Roles.test_administrator_can_use_administrator_endpoints,FR-SEC-02 FR-SEC-19
+B-31,Integration,backend/tests/test_auth.py,Roles.test_administrator_is_not_a_driver,FR-SEC-02 FR-SEC-19
+B-32,Integration,backend/tests/test_auth.py,Roles.test_token_without_a_valid_role_gets_403,FR-SEC-02 FR-SEC-19
+B-33,Integration,backend/tests/test_auth.py,Roles.test_legacy_admin_token_still_works_on_administrator_endpoints_only,FR-SEC-02 FR-SEC-19
+B-34,Integration,backend/tests/test_auth.py,OwnVehicle.test_driver_cannot_send_positions_for_another_vehicle,FR-SEC-02
+B-35,Integration,backend/tests/test_auth.py,OwnVehicle.test_one_foreign_position_in_a_batch_refuses_the_whole_batch,FR-SEC-02
+B-36,Integration,backend/tests/test_auth.py,OwnVehicle.test_own_vehicle_is_stored,FR-SEC-02
+B-37,Integration,backend/tests/test_auth.py,OwnVehicle.test_user_without_a_vehicle_cannot_send_positions,FR-SEC-02
+B-38,Integration,backend/tests/test_auth.py,Logging.test_failed_sign_in_is_logged_without_the_token,FR-SEC-21
+B-39,Integration,backend/tests/test_auth.py,Logging.test_wrong_role_and_missing_token_are_logged_with_a_reason,FR-SEC-21
 S-01,System,sil/test_sil.py,WholeChain.test_real_hazards_produce_warnings_for_following_cars,FR-15 FR-16
 S-02,System,sil/test_sil.py,WholeChain.test_invented_hazards_never_reach_warning_level,NFR-03 NFR-05 FR-11
 S-03,System,sil/test_sil.py,WholeChain.test_tampered_unknown_and_revoked_reports_are_refused,FR-SEC-03 FR-SEC-07 FR-SEC-12

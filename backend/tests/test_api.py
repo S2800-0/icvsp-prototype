@@ -10,6 +10,7 @@ from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 from fastapi.testclient import TestClient
 
 from icvsp_backend.app import create_app
+from icvsp_backend.auth import issue_dev_token
 from icvsp_backend.store import Store
 from icvsp.model import to_iso
 
@@ -18,6 +19,12 @@ GOLDEN = (ROOT / "verification/golden/device_reports_v2.jsonl").read_text().spli
 DEMO_KEY = json.loads(GOLDEN[0])["public_key"]
 T0 = 1790000000.0                  # 2026-09-21, the time of the golden reports
 ADMIN = {"X-Admin-Token": "test-admin"}
+JWT = "test-only-secret"
+
+
+def user(vehicle_id: str) -> dict:
+    """A signed-in driver whose vehicle is `vehicle_id` (sign-in and roles, auth.py)."""
+    return {"Authorization": "Bearer " + issue_dev_token(JWT, f"user-{vehicle_id}", "driver", vehicle_id)}
 
 
 class Clock:
@@ -63,7 +70,7 @@ class Base(unittest.TestCase):
     def setUp(self):
         self.clock = Clock(T0 + 60)
         self.store = Store()
-        self.client = TestClient(create_app(self.store, self.clock, admin_token="test-admin"))
+        self.client = TestClient(create_app(self.store, self.clock, admin_token="test-admin", jwt_secret=JWT))
 
     def tearDown(self):
         self.store.close()
@@ -191,7 +198,7 @@ class Hazards(Base):
             lat, lon = east(self.LAT, self.LON, along)
             rows.append({"vehicle_id": vid, "t": t0 + k, "lat": lat, "lon": lon, "speed_mps": speed,
                          "heading_deg": heading})
-        self.assertEqual(self.client.post("/beacons", json=rows).status_code, 200)
+        self.assertEqual(self.client.post("/beacons", json=rows, headers=user(vid)).status_code, 200)
 
     def two_reports(self, vetted, **report):
         cars = [Car("car-a"), Car("car-b")]
@@ -205,29 +212,29 @@ class Hazards(Base):
     def test_minor_hazard_is_not_shown_and_severity_is_reported(self):
         """Severity scope: two trusted cars that both measured a small jolt do not make a hazard worth showing."""
         self.two_reports(vetted=True, severity="low", imu_peak_g=0.2)
-        self.assertEqual(self.client.get("/hazards", params={"lat": self.LAT, "lon": self.LON}).json(), [])
+        self.assertEqual(self.client.get("/hazards", headers=user("car-q"), params={"lat": self.LAT, "lon": self.LON}).json(), [])
         ov = self.client.get("/admin/overview", headers=ADMIN).json()
         self.assertEqual([(h["state"], h["severity"]) for h in ov["hazards"]], [("suppressed", "low")])
 
     def test_two_vetted_cars_give_a_warning_ahead_only(self):
         self.two_reports(vetted=True)
         ahead_lat, ahead_lon = east(self.LAT, self.LON, -200)
-        hz = self.client.get("/hazards", params={"lat": ahead_lat, "lon": ahead_lon, "heading_deg": 90}).json()
+        hz = self.client.get("/hazards", headers=user("car-q"), params={"lat": ahead_lat, "lon": ahead_lon, "heading_deg": 90}).json()
         self.assertEqual(len(hz), 1)
         self.assertEqual(hz[0]["level"], "warning")
         self.assertEqual(hz[0]["independent_sources"], 2)
         self.assertEqual(hz[0]["severity"], "high")
         # a car going the other way, or already past it, is not warned
-        self.assertEqual(self.client.get("/hazards", params={"lat": ahead_lat, "lon": ahead_lon,
+        self.assertEqual(self.client.get("/hazards", headers=user("car-q"), params={"lat": ahead_lat, "lon": ahead_lon,
                                                              "heading_deg": 270}).json(), [])
         past_lat, past_lon = east(self.LAT, self.LON, 100)
-        self.assertEqual(self.client.get("/hazards", params={"lat": past_lat, "lon": past_lon,
+        self.assertEqual(self.client.get("/hazards", headers=user("car-q"), params={"lat": past_lat, "lon": past_lon,
                                                              "heading_deg": 90}).json(), [])
 
     def test_two_new_cars_give_only_an_advisory(self):
         """Cold start at system level: new devices (reliability 0.25) cannot raise a warning together."""
         self.two_reports(vetted=False)
-        hz = self.client.get("/hazards", params={"lat": self.LAT, "lon": self.LON, "radius_m": 300}).json()
+        hz = self.client.get("/hazards", headers=user("car-q"), params={"lat": self.LAT, "lon": self.LON, "radius_m": 300}).json()
         self.assertTrue(all(h["level"] == "advisory" for h in hz))
 
     def test_settle_rewards_confirmed_reports_once(self):
