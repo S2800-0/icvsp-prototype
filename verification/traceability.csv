@@ -51,6 +51,8 @@ T-49,System,engine/tests/test_severity.py,SeverityScope.test_camera_only_reports
 T-50,System,engine/tests/test_severity.py,SeverityScope.test_one_measured_severe_report_lets_camera_corroboration_count,FR-27
 T-51,Unit,engine/tests/test_severity.py,SeverityScope.test_lone_minor_report_gets_no_cold_start_advisory,FR-27
 T-52,Unit,engine/tests/test_severity.py,SeverityScope.test_threshold_is_configurable,FR-27
+T-53,Unit,engine/tests/test_scaling.py,SpatialShortcut.test_skipped_vehicles_could_never_have_passed,NFR-02 FR-12
+T-54,Integration,engine/tests/test_scaling.py,GridIndex.test_grid_index_gives_exactly_the_same_decisions,NFR-02 FR-09 FR-12
 F-01,Unit,firmware/test/test_bump_detector/test_main.cpp,test_speed_bump_is_detected_once_as_bump,FR-01
 F-02,Unit,firmware/test/test_bump_detector/test_main.cpp,test_pothole_is_detected_as_pothole,FR-01
 F-03,Unit,firmware/test/test_bump_detector/test_main.cpp,test_severity_follows_the_size_of_the_jolt,FR-01 FR-02

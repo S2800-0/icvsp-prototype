@@ -11,11 +11,12 @@ Steps inside Engine.decide():
 from __future__ import annotations
 
 import itertools
+import math
 from collections import defaultdict
 from dataclasses import dataclass, field
 
 from .config import Config
-from .geo import along_and_across, distance_m, heading_diff
+from .geo import EARTH_R, along_and_across, distance_m, heading_diff
 from .model import Beacon, HazardState, SafetyEvent
 from .trust import Reputation, Trust, freshness
 from .validation import Check, plausibility, schema_errors, trace_consistency
@@ -115,6 +116,9 @@ class Engine:
         cfg = self.cfg
         for tr in self.traces.values():
             tr.sort(key=lambda b: b.t)
+        self._reach = {vid: trace_reach(tr, cfg) for vid, tr in self.traces.items()}
+        self._order = {vid: i for i, vid in enumerate(self.traces)}
+        self._index(cfg)
         report = Report(now=now, rejected=list(self.malformed))
 
         accepted: list[Scored] = []
@@ -142,21 +146,104 @@ class Engine:
             report.decisions.append(self._decide_cluster(f"hz_{i + 1:04d}", cluster, now))
         return report
 
+    def _index(self, cfg: Config) -> None:
+        """Grid indexes so each hazard only looks at reports and vehicles near it. Anything that can reach further
+        than GRID_REACH_M (poor GPS accuracy, long gaps between positions) is always checked, so no result changes."""
+        pts = [e.lat for e in self.inbox if e.gps_valid] + [b.lat for tr in self.traces.values() for b in tr[:1]]
+        lat0 = sum(pts) / len(pts) if pts else 0.0
+        self._event_grid, self._vehicle_grid = _Grid(lat0), _Grid(lat0)
+        self._segments: dict[str, dict[tuple[int, int], list[int]]] = {}
+        for e in self.inbox:
+            if not e.gps_valid:
+                continue
+            if 3 * cfg.merge_radius_m + e.acc_m <= GRID_REACH_M:
+                self._event_grid.add(e.lat, e.lon, e)
+            else:
+                self._event_grid.always.append(e)
+        for vid, tr in self.traces.items():
+            reach = self._reach.get(vid)
+            if reach is None:
+                continue
+            pad_m = (reach[1] - max(b.lat for b in tr)) * 111320.0       # step + pass radius + 1 m (trace_reach)
+            if pad_m <= GRID_REACH_M:
+                segs: dict[tuple[int, int], list[int]] = defaultdict(list)   # cell -> steps with an end in it
+                for k, (a, b) in enumerate(zip(tr, tr[1:])):
+                    ka, kb = self._vehicle_grid.key(a.lat, a.lon), self._vehicle_grid.key(b.lat, b.lon)
+                    segs[ka].append(k)
+                    if kb != ka:
+                        segs[kb].append(k)
+                self._segments[vid] = segs
+                for key in segs:
+                    self._vehicle_grid.cells[key].append(vid)
+            else:
+                self._vehicle_grid.always.append(vid)
+
+    def _near_steps(self, vid: str, lat: float, lon: float) -> list[int] | None:
+        """Indexes (in time order) of the steps of a vehicle's trace with an end in the 3 x 3 cells around a point,
+        or None to check every step. A crossing step has an end within (step + pass radius) of the point, which is
+        inside those cells for every vehicle indexed by cell (see _index)."""
+        segs = self._segments.get(vid)
+        if segs is None:
+            return None
+        i, j = self._vehicle_grid.key(lat, lon)
+        return sorted({k for di in (-1, 0, 1) for dj in (-1, 0, 1) for k in segs.get((i + di, j + dj), ())})
+
     def _cluster(self, items: list[Scored]) -> list[list[Scored]]:
+        """Each report joins the FIRST existing cluster (in creation order) of its type and direction whose centre is
+        within the merge radius, or starts a new one. Clusters are found through a grid on their centres; reports or
+        clusters with poor GPS (a merge radius wider than a grid cell) are compared with everything, so the result
+        is exactly that of comparing every report with every cluster."""
+        cfg = self.cfg
         clusters: list[list[Scored]] = []
+        # running sums of latitude, longitude and stated accuracy: the same values as summing the cluster each time
+        sums: list[list[float]] = []
+        lat0 = sum(x.event.lat for x in items) / len(items) if items else 0.0
+        grid, cell_of, wide = _Grid(lat0), [], set()       # wide: clusters whose mean accuracy is poor
+        half = (GRID_REACH_M - cfg.merge_radius_m) / 2      # each half of the merge radius' accuracy term
+
+        def place(i: int) -> None:
+            n = len(clusters[i])
+            if 0.5 * sums[i][2] / n > half:
+                wide.add(i)
+                return
+            wide.discard(i)
+            key = grid.key(sums[i][0] / n, sums[i][1] / n)
+            if cell_of[i] != key:
+                if cell_of[i] is not None:
+                    grid.cells[cell_of[i]].remove(i)
+                grid.cells[key].append(i)
+                cell_of[i] = key
+
         for s in items:
-            for cl in clusters:
-                lat, lon = _centroid(cl)
+            if 0.5 * s.event.acc_m > half:
+                candidates = range(len(clusters))            # poor GPS: compare with every cluster
+            else:
+                i0, j0 = grid.key(s.event.lat, s.event.lon)
+                near = [i for di in (-1, 0, 1) for dj in (-1, 0, 1) for i in grid.cells.get((i0 + di, j0 + dj), ())]
+                candidates = sorted(set(near) | wide)
+            target = None
+            for i in candidates:
+                cl = clusters[i]
+                n = len(cl)
+                lat, lon = sums[i][0] / n, sums[i][1] / n
                 head = cl[0].event
                 # the merge radius grows with the GPS accuracy the reports themselves state
-                radius = self.cfg.merge_radius_m + 0.5 * (s.event.acc_m + sum(x.event.acc_m for x in cl) / len(cl))
+                radius = cfg.merge_radius_m + 0.5 * (s.event.acc_m + sums[i][2] / n)
                 if (s.event.type == head.type
                         and distance_m(lat, lon, s.event.lat, s.event.lon) <= radius
-                        and heading_diff(s.event.heading_deg, head.heading_deg) <= self.cfg.heading_tol_deg):
-                    cl.append(s)
+                        and heading_diff(s.event.heading_deg, head.heading_deg) <= cfg.heading_tol_deg):
+                    target = i
                     break
-            else:
-                clusters.append([s])
+            if target is None:
+                clusters.append([])
+                sums.append([0.0, 0.0, 0.0])
+                cell_of.append(None)
+                target = len(clusters) - 1
+            clusters[target].append(s)
+            sums[target][0] += s.event.lat
+            sums[target][1] += s.event.lon
+            sums[target][2] += s.event.acc_m
+            place(target)
         return clusters
 
     def _decide_cluster(self, hid: str, cluster: list[Scored], now: float) -> Decision:
@@ -184,15 +271,17 @@ class Engine:
         # negative evidence: drove over the spot, detector on, reported nothing.
         # A vehicle that reported this hazard type nearby (even if its report landed in a
         # neighbouring cluster because of GPS error) is never counted against it.
-        reported_nearby = {e.source for e in self.inbox
-                           if e.type == head.type and e.gps_valid
+        reported_nearby = {e.source for e in self._event_grid.near(lat, lon)
+                           if e.type == head.type
                            and distance_m(lat, lon, e.lat, e.lon) <= 3 * cfg.merge_radius_m + e.acc_m
                            and heading_diff(e.heading_deg, heading) <= cfg.heading_tol_deg}
         contra: list[Evidence] = []
-        for vid, trace in self.traces.items():
-            if vid in best or vid in reported_nearby:
+        # only vehicles near the hazard, in the same order as self.traces (the order the evidence is summed in)
+        for vid in sorted(set(self._vehicle_grid.near(lat, lon)), key=self._order.__getitem__):
+            trace = self.traces[vid]
+            if vid in best or vid in reported_nearby or not could_pass(self._reach.get(vid), lat, lon):
                 continue
-            t_pass = pass_time(trace, lat, lon, heading, cfg)
+            t_pass = pass_time(trace, lat, lon, heading, cfg, self._near_steps(vid, lat, lon))
             if t_pass is None or t_pass < first_seen - cfg.pass_window_s:
                 continue
             g, _ = trace_consistency(trace, cfg)
@@ -335,14 +424,65 @@ class Engine:
 
 
 # ---------- helpers ----------
+GRID_CELL_M = 100.0     # index cell size
+GRID_REACH_M = 80.0     # items that reach further than this are checked for every hazard (20 % margin for the
+                        # small difference between a cell's size and the distance formula across latitudes)
+
+
+class _Grid:
+    """Items in about 100 m cells; near() returns the items in the 3 x 3 cells around a point, plus the items that
+    reach further than a cell (`always`)."""
+
+    def __init__(self, lat0: float):
+        self.dlat = math.degrees(GRID_CELL_M / EARTH_R)
+        self.dlon = math.degrees(GRID_CELL_M / (EARTH_R * max(0.1, math.cos(math.radians(lat0)))))
+        self.cells: dict[tuple[int, int], list] = defaultdict(list)
+        self.always: list = []
+
+    def key(self, lat: float, lon: float) -> tuple[int, int]:
+        return math.floor(lat / self.dlat), math.floor(lon / self.dlon)
+
+    def add(self, lat: float, lon: float, item) -> None:
+        self.cells[self.key(lat, lon)].append(item)
+
+    def near(self, lat: float, lon: float):
+        i, j = self.key(lat, lon)
+        for di in (-1, 0, 1):
+            for dj in (-1, 0, 1):
+                yield from self.cells.get((i + di, j + dj), ())
+        yield from self.always
+
 def _centroid(cluster: list[Scored]) -> tuple[float, float]:
     return (sum(s.event.lat for s in cluster) / len(cluster),
             sum(s.event.lon for s in cluster) / len(cluster))
 
 
-def pass_time(trace: list[Beacon], lat: float, lon: float, heading: float, cfg: Config) -> float | None:
-    """Time a vehicle drove over a point (same direction, detector on), or None."""
-    for a, b in zip(trace, trace[1:]):
+def trace_reach(trace: list[Beacon], cfg: Config) -> tuple[float, float, float, float] | None:
+    """Bounding box (lat/lon) of the points where `trace` could have driven over a hazard: the trace's own box,
+    widened by its longest step plus the pass radius. pass_time() can only succeed for a point inside it: a
+    crossing step has an endpoint within (step length + pass radius) of the point. Lets decide() skip far-away
+    vehicles without changing any result."""
+    if len(trace) < 2:
+        return None
+    step = max(distance_m(a.lat, a.lon, b.lat, b.lon) for a, b in zip(trace, trace[1:]))
+    pad = step + cfg.pass_radius_m + 1.0
+    lats = [b.lat for b in trace]
+    lons = [b.lon for b in trace]
+    dlat = pad / 111320.0
+    dlon = pad / (111320.0 * max(0.1, math.cos(math.radians(sum(lats) / len(lats)))))
+    return min(lats) - dlat, max(lats) + dlat, min(lons) - dlon, max(lons) + dlon
+
+
+def could_pass(reach: tuple[float, float, float, float] | None, lat: float, lon: float) -> bool:
+    return reach is not None and reach[0] <= lat <= reach[1] and reach[2] <= lon <= reach[3]
+
+
+def pass_time(trace: list[Beacon], lat: float, lon: float, heading: float, cfg: Config,
+              steps: list[int] | None = None) -> float | None:
+    """Time a vehicle drove over a point (same direction, detector on), or None. `steps` limits the check to these
+    steps (index k = trace[k] -> trace[k + 1], in time order); the first crossing found is the same."""
+    pairs = zip(trace, trace[1:]) if steps is None else ((trace[k], trace[k + 1]) for k in steps)
+    for a, b in pairs:
         if not (a.detector_on and b.detector_on):
             continue
         if heading_diff(a.heading_deg, heading) > cfg.heading_tol_deg:

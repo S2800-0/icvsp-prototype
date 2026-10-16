@@ -35,6 +35,16 @@ python3 sil/compare_cameras.py                 # same scenarios with each camera
 Each camera model's hit rate and false-report rate after the device logic, measured on the held-out Cairo videos,
 is plugged into the simulation (`CAMERAS` in `run_sil.py`). Results: [`results/camera_comparison.md`](results/camera_comparison.md).
 
+## Load test
+
+```bash
+python3 sil/load_test.py                       # the real backend over HTTP, 25 to 1600 cars -> results/load_test.md
+```
+
+Cars around Cairo upload positions and signed reports while drivers ask for hazards; it measures response times as
+the data grows. It found that hazard queries took 53 s at 200 cars; after the fix they take 72 ms (0.46 s at 1,600
+cars), with the same decisions: [`results/load_test.md`](results/load_test.md).
+
 ## Live demo with the dashboard
 
 ```bash

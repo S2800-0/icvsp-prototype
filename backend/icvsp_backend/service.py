@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import threading
 from typing import Callable
 
 from icvsp.config import Config
@@ -19,9 +20,15 @@ from .verify import Envelope, Rejected, parse, verify_signature
 BEACON_WINDOW_S = 2 * 3600   # position history kept in the decision (plausibility and "drove past")
 
 
+DECISION_MAX_AGE_S = 1.0   # hazard answers may use trust decisions this old (the device itself waits 3 s to fuse)
+
+
 class Service:
-    def __init__(self, store: Store, cfg: Config | None = None):
+    def __init__(self, store: Store, cfg: Config | None = None, max_age_s: float = DECISION_MAX_AGE_S):
         self.store, self.cfg = store, cfg or Config()
+        self.max_age_s = max_age_s
+        self._cache: tuple[int, float, list[Decision]] | None = None   # (store version, time, decisions)
+        self._cache_lock = threading.Lock()
 
     # ---------- devices ----------
     def register(self, device_id: str, public_key: str, now: float, vetted: bool = False) -> None:
@@ -97,8 +104,19 @@ class Service:
         return eng, settled
 
     def decide(self, now: float) -> list[Decision]:
-        eng, _ = self._engine(now)
-        return eng.decide(now).decisions
+        """The trust engine's decisions, recomputed only when the data changed and the last result is older than
+        max_age_s (or the data is unchanged and it is older than 10 x that). Many drivers asking at the same moment
+        then share one computation instead of each running the engine (load test, sil/load_test.py)."""
+        with self._cache_lock:
+            c = self._cache
+            if c is not None and 0 <= now - c[1] and (
+                    now - c[1] < self.max_age_s or (c[0] == self.store.version and now - c[1] < 10 * self.max_age_s)):
+                return c[2]
+            version = self.store.version
+            eng, _ = self._engine(now)
+            decisions = eng.decide(now).decisions
+            self._cache = (version, now, decisions)
+            return decisions
 
     def settle(self, now: float) -> list[str]:
         """Reputation update from confident outcomes, each report and each pass-by counted once."""

@@ -48,6 +48,7 @@ class Store:
         self.db = sqlite3.connect(path, check_same_thread=False)
         self.db.row_factory = sqlite3.Row
         self.lock = threading.Lock()
+        self.version = 0          # increases on every write; lets the service know its cached decisions are stale
         with self.lock:
             self.db.executescript(SCHEMA)
 
@@ -57,7 +58,9 @@ class Store:
     def _x(self, sql: str, args=()) -> sqlite3.Cursor:
         with self.lock:
             cur = self.db.execute(sql, args)
-            self.db.commit()
+            if not sql.lstrip().upper().startswith("SELECT"):
+                self.db.commit()
+                self.version += 1
             return cur
 
     # devices
@@ -116,6 +119,7 @@ class Store:
         with self.lock:
             self.db.executemany("INSERT OR IGNORE INTO beacons VALUES (?, ?, ?, ?, ?, ?, ?)", rows)
             self.db.commit()
+            self.version += 1
 
     def beacons_since(self, t: float) -> list[sqlite3.Row]:
         return self._x("SELECT * FROM beacons WHERE t >= ? ORDER BY t", (t,)).fetchall()
