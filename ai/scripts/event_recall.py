@@ -34,6 +34,9 @@ def main():
     ap.add_argument('--min-hits', type=int, default=2)
     ap.add_argument('--gap', type=float, default=1.5)
     ap.add_argument('--out', default=None, help='optional CSV with one row per event')
+    ap.add_argument('--severe-only', action='store_true',
+                    help="score only hazards tagged severe (FR-27 scope); detections near a minor hazard are "
+                         "still not counted as false alarms")
     a = ap.parse_args()
 
     dets = defaultdict(list)                       # (clip, class) -> [(t, conf)]
@@ -51,6 +54,9 @@ def main():
         lo, hi = e['t'] - a.before, e['t'] + a.after
         inside = [(i, t, c) for i, (t, c) in enumerate(dets[(e['clip'], e['type'])]) if lo <= t <= hi]
         used[(e['clip'], e['type'])].update(i for i, _, _ in inside)
+        if a.severe_only and e.get('severity') == 'minor':
+            print(f"{e['clip']:26s} {e['time']:>6s}  {e['type']:11s} {'minor':9s} (not scored)")
+            continue
         ok = len(inside) >= a.min_hits
         best = max((c for _, _, c in inside), default=0)
         first = min((t for _, t, _ in inside), default=None)

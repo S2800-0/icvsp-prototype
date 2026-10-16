@@ -87,7 +87,8 @@ input[type=range] { vertical-align: middle; }
   <div class="keys">
     <kbd>Space</kbd> play/pause · <kbd>←</kbd><kbd>→</kbd> 1 s · <kbd>Shift</kbd>+<kbd>←</kbd><kbd>→</kbd> 5 s ·
     <kbd>.</kbd><kbd>,</kbd> next / previous detection · <kbd>]</kbd><kbd>[</kbd> next / previous team event ·
-    tag here: <kbd>B</kbd> speed bump, <kbd>H</kbd> pothole, <kbd>D</kbd> dip · <kbd>Z</kbd> undo last tag.
+    tag here: <kbd>B</kbd> speed bump, <kbd>H</kbd> pothole (severe: makes a driver slow down or swerve),
+    <kbd>Shift</kbd>+<kbd>B</kbd> / <kbd>Shift</kbd>+<kbd>H</kbd> minor one, <kbd>D</kbd> dip · <kbd>Z</kbd> undo last tag.
     Top timeline = whole drive, bottom = 60 s around the playhead. Click either to jump.
   </div>
   <div class="bar" style="margin-top:10px">
@@ -184,7 +185,7 @@ $('detFile').onchange = async e => {
   draw();
 };
 $('evFile').onchange = async e => {
-  events = parseCSV(await e.target.files[0].text()).map(r => ({ clip: r.clip, t: secs(r.time), type: r.type, note: r.note || '' }));
+  events = parseCSV(await e.target.files[0].text()).map(r => ({ clip: r.clip, t: secs(r.time), type: r.type, severity: r.severity || '', note: r.note || '' }));
   draw();
 };
 $('conf').oninput = () => { $('confV').textContent = (+$('conf').value).toFixed(2); draw(); };
@@ -280,7 +281,7 @@ function renderTags() {
   $('tagList').innerHTML = tags.length ? '' : '<span class="muted">No tags yet.</span>';
   [...tags].sort((a, b) => a.t - b.t).forEach(e => {
     const d = document.createElement('div');
-    d.innerHTML = `${fmt(e.t)}  <span class="pill" style="background:${colour(e.type)}">${e.type}</span>`;
+    d.innerHTML = `${fmt(e.t)}  <span class="pill" style="background:${colour(e.type)}">${e.type}</span>${e.severity ? ' ' + e.severity : ''}`;
     d.onclick = () => vid.currentTime = Math.max(0, e.t - 4);
     $('tagList').appendChild(d);
   });
@@ -288,8 +289,8 @@ function renderTags() {
 }
 $('exportEv').onclick = () => {
   const rows = [...tags].sort((a, b) => a.t - b.t)
-    .map(e => `${clipName},${Math.floor(e.t / 60)}:${String(Math.round(e.t % 60)).padStart(2, '0')},${e.type},tagged in review.html`);
-  download(clipName.replace(/\.[^.]+$/, '') + '_events.csv', 'clip,time,type,note\n' + rows.join('\n') + '\n');
+    .map(e => `${clipName},${Math.floor(e.t / 60)}:${String(Math.round(e.t % 60)).padStart(2, '0')},${e.type},${e.severity || ''},tagged in review.html`);
+  download(clipName.replace(/\.[^.]+$/, '') + '_events.csv', 'clip,time,type,severity,note\n' + rows.join('\n') + '\n');
 };
 
 // ================================================================ FRAMES
@@ -389,7 +390,10 @@ addEventListener('keydown', e => {
     const n = k === ']' ? ev.find(x => x > t + 0.2) : [...ev].reverse().find(x => x < t - 0.5);
     if (n !== undefined) vid.currentTime = Math.max(0, n);
   }
-  else if (k === 'b' || k === 'h' || k === 'd') { tags.push({ t, type: { b: 'speed_bump', h: 'pothole', d: 'dip' }[k] }); renderTags(); }
+  else if (k === 'b' || k === 'h' || k === 'd') {
+    tags.push({ t, type: { b: 'speed_bump', h: 'pothole', d: 'dip' }[k], severity: k === 'd' ? '' : e.shiftKey ? 'minor' : 'severe' });
+    renderTags();
+  }
   else if (k === 'z') { tags.pop(); renderTags(); }
   else return;
   e.preventDefault();
