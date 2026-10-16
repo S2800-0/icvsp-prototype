@@ -45,3 +45,7 @@ ai/models/*_esp32s3.json
 
 # backend database files (local runs)
 *.sqlite3
+
+# unfinished browser downloads
+*.crdownload
+*.part
