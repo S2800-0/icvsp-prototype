@@ -133,7 +133,7 @@ def main():
         fired, quiet = [], []
         for k, r in enumerate(model.predict(source=str(path), imgsz=a.imgsz, conf=a.conf, device=a.device,
                                             stream=True, vid_stride=stride, verbose=False)):
-            idx = k * stride
+            idx = (k + 1) * stride - 1   # Ultralytics grabs `stride` frames before each read
             if any(lo <= idx / fps <= hi for lo, hi in avoid.get(Path(v['file']).stem, [])):
                 continue
             hit = [model.names[int(c)] for c in r.boxes.cls.tolist()]

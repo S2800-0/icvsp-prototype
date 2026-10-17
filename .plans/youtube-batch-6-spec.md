@@ -12,12 +12,12 @@ All from @egyptianstreetsvlog (the channel our earlier Cairo videos came from), 
 
 | File | Length | Split | Tagged by |
 |---|---|---|---|
-| delta_yt_08_cairo_mansoura.mp4 | 1:58 | train | Rana |
+| delta_yt_08_cairo_mansoura.mp4 | 1:58 | train | Shahesta |
 | cairo_yt_09_night.mp4 | 22 min | train | Shahesta |
 | cairo_yt_10_day.mp4 | 20 min | train | Shahesta |
-| cairo_yt_11_day.mp4 | 19 min | train | Rana |
+| cairo_yt_11_day.mp4 | 19 min | train | Shahesta |
 | cairo_yt_12_sunset.mp4 | 29 min | train | Shahesta |
-| cairo_yt_13_corniche_night.mp4 | 29 min | train | Rana |
+| cairo_yt_13_corniche_night.mp4 | 29 min | train | Shahesta |
 | cairo_yt_14_night_test.mp4 | 27 min | **test** | Shahesta |
 | cairo_yt_15_day_test.mp4 | 25 min | **test** | Shahesta |
 
@@ -27,8 +27,8 @@ better than on another car; accepted for now, the real test set is our own recor
 
 ## Roles
 
-- **Shahesta:** tags 3 training videos and both test videos; corrects boxes; checks all of Rana's boxes.
-- **Rana:** tags 3 training videos (including the 2-hour Delta drive); corrects boxes on her videos.
+- **Shahesta:** tagged all 8 videos (done 17 Oct); corrects boxes; checks all of Rana's boxes.
+- **Rana:** corrects boxes on videos 08, 11 and 13 in CVAT.
 - Both follow `ai/LABELLING_POLICY.md`.
 - Time budget: about 6–8 hours in total, so about 800 frames to correct.
 
@@ -45,9 +45,10 @@ Add the 8 rows to `ai/data/videos/videos.csv` with `split=train` or `split=test`
 - `event_recall.py` and `firmware/tools/score_logic.py` gain an option to score only severe hazards.
 
 ### 3. Tag the hazards
-- **Training videos:** watched at 2x, split as in the table. Every hazard tagged, severe or minor.
+- **Training videos:** watched at 2x. Only severe hazards were tagged; minor ones were skipped (done 17 Oct: 59 tags).
 - **Test videos:** watched at normal speed, every hazard tagged with severity. This becomes the new Egyptian test
-  set, next to the existing Cairo night and day videos.
+  set, next to the existing Cairo night and day videos. Done 17 Oct: video 14 has 11 severe hazards (7 potholes,
+  4 bumps), video 15 has 2 bumps. Small, so it is scored together with the existing Cairo test videos.
 
 ### 4. Pick the frames (`harvest_frames.py`, v5 model)
 - **Tag mode:** 3 frames before each training tag (2.5, 1.5 and 0.5 s before).
