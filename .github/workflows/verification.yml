@@ -14,13 +14,13 @@ jobs:
   # ---- left side of the V is the requirements and design; these jobs are the right side, one per level ----
   unit-firmware:
     name: "Unit: device firmware (C++, Unity)"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: ~/.platformio
           key: platformio-${{ runner.os }}-${{ hashFiles('firmware/platformio.ini') }}
@@ -28,16 +28,16 @@ jobs:
       - name: PlatformIO native tests
         working-directory: firmware
         run: pio test -e native -v --junit-output-path ../firmware.xml
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         if: always()
         with: {name: results-firmware, path: firmware.xml}
 
   unit-engine:
     name: "Unit + component: trust engine"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - run: pip install pytest pytest-cov cryptography
@@ -47,7 +47,7 @@ jobs:
         run: |
           echo "### Trust engine code coverage" >> "$GITHUB_STEP_SUMMARY"
           python -m coverage report --format=markdown >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         if: always()
         with:
           name: results-engine
@@ -57,10 +57,10 @@ jobs:
 
   integration-backend:
     name: "Integration: backend API"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - run: pip install pytest pytest-cov cryptography fastapi httpx
@@ -70,7 +70,7 @@ jobs:
         run: |
           echo "### Backend code coverage" >> "$GITHUB_STEP_SUMMARY"
           python -m coverage report --format=markdown >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         if: always()
         with:
           name: results-backend
@@ -80,33 +80,33 @@ jobs:
 
   integration-device-engine:
     name: "Integration: device reports -> engine (Ed25519)"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - run: pip install cryptography
       - name: Reports signed by the device code, checked by an independent library
         working-directory: firmware
         run: python tools/check_with_engine.py | tee ../integration.log
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         if: always()
         with: {name: results-integration, path: integration.log}
 
   system-sil:
     name: "System: whole chain in simulation"
     needs: [unit-firmware, unit-engine, integration-backend, integration-device-engine]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - run: pip install pytest cryptography fastapi httpx
       - name: 40 simulated cars with faults and attackers (real device code, real backend)
         run: python -m pytest sil/test_sil.py -v --junitxml=sil.xml
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         if: always()
         with: {name: results-sil, path: sil.xml}
 
@@ -114,16 +114,16 @@ jobs:
     name: "Traceability: requirement -> test -> result"
     needs: [unit-firmware, unit-engine, integration-backend, integration-device-engine, system-sil]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       checks: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           pattern: results-*
           path: results
@@ -140,7 +140,7 @@ jobs:
             --junit results/backend.xml --junit results/sil.xml --integration-log results/integration.log \
             --out traceability_report.md
           cat traceability_report.md >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         if: always()
         with:
           name: verification-evidence
@@ -150,10 +150,10 @@ jobs:
 
   static-analysis:
     name: Static analysis
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - name: Python (ruff, pyflakes rules)
