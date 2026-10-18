@@ -1,4 +1,4 @@
-# V-cycle verification on every push: unit, integration, system (simulation) and traceability checks.
+# V-cycle verification on every push: one job per level (unit, integration, system), then requirement traceability.
 # Security scans (Gitleaks, Semgrep, Trivy) are added by the cybersecurity team (Gantt C2).
 name: verification
 
@@ -11,8 +11,9 @@ permissions:
   contents: read
 
 jobs:
-  tests:
-    name: Unit + integration tests, traceability
+  # ---- left side of the V is the requirements and design; these jobs are the right side, one per level ----
+  unit-firmware:
+    name: "Unit: device firmware (C++, Unity)"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,49 +24,128 @@ jobs:
         with:
           path: ~/.platformio
           key: platformio-${{ runner.os }}-${{ hashFiles('firmware/platformio.ini') }}
-      - name: Install tools
-        run: pip install platformio cryptography coverage fastapi httpx
-
-      - name: Trust engine tests (unit, integration, system scenarios)
-        working-directory: engine
-        run: coverage run -m unittest -v 2>&1 | tee ../engine.log
-
-      - name: Engine coverage
-        working-directory: engine
-        run: coverage report -m --include="icvsp/*" | tee -a "$GITHUB_STEP_SUMMARY"
-
-      - name: Backend API tests (signature, registry, replay, schema, hazards, reputation)
-        working-directory: backend
-        run: python -m unittest -v 2>&1 | tee ../backend.log
-
-      - name: Device firmware unit tests (PlatformIO native)
+      - run: pip install platformio
+      - name: PlatformIO native tests
         working-directory: firmware
-        run: pio test -e native -v | tee ../firmware.log
+        run: pio test -e native -v --junit-output-path ../firmware.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: results-firmware, path: firmware.xml}
 
-      - name: Device -> engine integration (signed reports, independent Ed25519 check)
+  unit-engine:
+    name: "Unit + component: trust engine"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pytest pytest-cov cryptography
+      - name: Engine tests with coverage
+        run: python -m pytest engine/tests -v --junitxml=engine.xml --cov=engine/icvsp --cov-report=term-missing --cov-report=html:coverage-engine
+      - name: Coverage summary
+        run: |
+          echo "### Trust engine code coverage" >> "$GITHUB_STEP_SUMMARY"
+          python -m coverage report --format=markdown >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: results-engine
+          path: |
+            engine.xml
+            coverage-engine
+
+  integration-backend:
+    name: "Integration: backend API"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pytest pytest-cov cryptography fastapi httpx
+      - name: Backend tests with coverage (signatures, registry, replay, sign-in, roles, rate limits)
+        run: python -m pytest backend/tests -v --junitxml=backend.xml --cov=backend/icvsp_backend --cov-report=term-missing --cov-report=html:coverage-backend
+      - name: Coverage summary
+        run: |
+          echo "### Backend code coverage" >> "$GITHUB_STEP_SUMMARY"
+          python -m coverage report --format=markdown >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: results-backend
+          path: |
+            backend.xml
+            coverage-backend
+
+  integration-device-engine:
+    name: "Integration: device reports -> engine (Ed25519)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install cryptography
+      - name: Reports signed by the device code, checked by an independent library
         working-directory: firmware
         run: python tools/check_with_engine.py | tee ../integration.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: results-integration, path: integration.log}
 
-      - name: System test (whole chain in simulation, with attackers)
-        run: python -m unittest sil/test_sil.py -v 2>&1 | tee sil.log
+  system-sil:
+    name: "System: whole chain in simulation"
+    needs: [unit-firmware, unit-engine, integration-backend, integration-device-engine]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pytest cryptography fastapi httpx
+      - name: 40 simulated cars with faults and attackers (real device code, real backend)
+        run: python -m pytest sil/test_sil.py -v --junitxml=sil.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: results-sil, path: sil.xml}
 
-      - name: Requirement traceability
+  traceability:
+    name: "Traceability: requirement -> test -> result"
+    needs: [unit-firmware, unit-engine, integration-backend, integration-device-engine, system-sil]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: results-*
+          path: results
+          merge-multiple: true
+      - name: Test report (all levels)
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          check_name: Test results
+          files: results/*.xml
+      - name: Requirement coverage
         run: |
-          python verification/check_traceability.py --unittest-log engine=engine.log \
-            --unittest-log backend=backend.log --unittest-log sil=sil.log --firmware-log firmware.log \
-            --integration-log integration.log --out traceability_report.md
+          python verification/check_traceability.py --junit results/firmware.xml --junit results/engine.xml \
+            --junit results/backend.xml --junit results/sil.xml --integration-log results/integration.log \
+            --out traceability_report.md
           cat traceability_report.md >> "$GITHUB_STEP_SUMMARY"
-
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: verification-evidence
           path: |
-            engine.log
-            backend.log
-            sil.log
-            firmware.log
-            integration.log
+            results
             traceability_report.md
 
   static-analysis:

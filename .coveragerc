@@ -1,0 +1,5 @@
+# Code coverage of the product code. Left out: command-line demo and plotting helpers (no product logic).
+[run]
+omit =
+    engine/icvsp/demo.py
+    engine/icvsp/plot.py

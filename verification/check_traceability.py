@@ -1,18 +1,17 @@
 """Requirement -> test -> result traceability check (V-cycle, right side).
 
-Reads the test logs written by CI (or by a local run), the test list in traceability.csv and the requirement
+Reads the test results written by CI (or by a local run), the test list in traceability.csv and the requirement
 list in requirements.csv, and
   1. fails if a test in the code is not in traceability.csv, or a listed test no longer exists,
   2. fails if a listed test failed or did not run,
   3. fails if a test names a requirement ID that is not in requirements.csv,
   4. writes a report: every requirement with its tests and an overall result.
 
-    (cd engine && python3 -m unittest -v 2> ../engine.log)
-    (cd backend && python3 -m unittest -v 2> ../backend.log)
-    python3 -m unittest sil/test_sil.py -v 2> sil.log
-    (cd firmware && pio test -e native -v > ../firmware.log && python3 tools/check_with_engine.py > ../integration.log)
-    python3 verification/check_traceability.py --unittest-log engine=engine.log --unittest-log backend=backend.log \
-        --unittest-log sil=sil.log --firmware-log firmware.log --integration-log integration.log
+    python3 -m pytest --junitxml=python.xml                       # engine, backend and simulation suites
+    (cd firmware && pio test -e native --junit-output-path ../firmware.xml && python3 tools/check_with_engine.py > ../integration.log)
+    python3 verification/check_traceability.py --junit python.xml --junit firmware.xml --integration-log integration.log
+
+  (verification/run_all.sh does all of this.) Plain `unittest -v` logs are also accepted (--unittest-log, --firmware-log).
 
 Experiments (E-) are long or need private data, and inspections (I-) are done by a person, so they are not
 rerun here; the report shows them as "recorded".
@@ -21,6 +20,7 @@ import argparse
 import csv
 import re
 import sys
+import xml.etree.ElementTree as ET
 from collections import defaultdict
 from pathlib import Path
 
@@ -46,7 +46,24 @@ def code_tests() -> set[tuple[str, str]]:
     return found
 
 
-def results(unittest_logs: dict[str, str], firmware_log: str, integration_log: str | None) -> dict[tuple[str, str], str]:
+def junit_results(path: Path) -> dict[tuple[str, str], str]:
+    """JUnit XML from pytest (classname = module path + class) or PlatformIO (file = test/<suite>/test_main.cpp)."""
+    res = {}
+    root = ET.parse(path).getroot()
+    for tc in root.iter('testcase'):
+        bad = any(c.tag in ('failure', 'error') for c in tc) or tc.get('status') in ('FAILED', 'ERRORED')
+        outcome = 'Fail' if bad else 'Not run' if tc.find('skipped') is not None or tc.get('status') == 'SKIPPED' else 'Pass'
+        if tc.get('file', '').startswith('test/') and tc.get('file', '').endswith('.cpp'):      # PlatformIO
+            key = (f"firmware/{tc.get('file')}", tc.get('name'))
+        else:                                                                                      # pytest
+            *mod, cls = tc.get('classname', '').split('.')
+            key = ('/'.join(mod) + '.py', f"{cls}.{tc.get('name')}")
+        if res.get(key) != 'Fail':        # a test with subtests appears more than once; any failure wins
+            res[key] = outcome
+    return res
+
+
+def results(unittest_logs: dict[str, str], firmware_log: str | None, integration_log: str | None) -> dict[tuple[str, str], str]:
     res = {}
     # "test_x (tests.module.Class.test_x) ... ok"; a test with a docstring prints the docstring on a second line.
     # Each log comes with the folder its tests were run from (engine, backend) or live in (sil).
@@ -59,7 +76,7 @@ def results(unittest_logs: dict[str, str], firmware_log: str, integration_log: s
             if parts[0] == base:
                 parts = parts[1:]
             res[(f'{base}/{"/".join(parts)}.py', f'{cls}.{name}')] = 'Pass' if outcome == 'ok' else 'Fail'
-    for m in re.finditer(r'^test/(\w+)/test_main\.cpp:\d+:(\w+):(PASS|FAIL|IGNORE)', firmware_log, re.M):
+    for m in re.finditer(r'^test/(\w+)/test_main\.cpp:\d+:(\w+):(PASS|FAIL|IGNORE)', firmware_log or '', re.M):
         suite, name, outcome = m.groups()
         res[(f'firmware/test/{suite}/test_main.cpp', name)] = 'Pass' if outcome == 'PASS' else 'Fail'
     if integration_log is not None:
@@ -72,9 +89,10 @@ def results(unittest_logs: dict[str, str], firmware_log: str, integration_log: s
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument('--unittest-log', action='append', required=True, metavar='FOLDER=LOG',
+    ap.add_argument('--junit', action='append', default=[], help='JUnit XML from pytest or PlatformIO (repeat)')
+    ap.add_argument('--unittest-log', action='append', default=[], metavar='FOLDER=LOG',
                     help='Python unittest -v output, e.g. engine=engine.log (repeat for each suite)')
-    ap.add_argument('--firmware-log', required=True)
+    ap.add_argument('--firmware-log', help='PlatformIO `pio test -v` output')
     ap.add_argument('--integration-log')
     ap.add_argument('--out', default='traceability_report.md')
     a = ap.parse_args()
@@ -82,8 +100,10 @@ def main() -> int:
     reqs = {r['id']: r for r in csv.DictReader(open(HERE / 'requirements.csv'))}
     items = list(csv.DictReader(open(HERE / 'traceability.csv')))
     logs = {k: Path(v).read_text() for k, v in (x.split('=', 1) for x in a.unittest_log)}
-    res = results(logs, Path(a.firmware_log).read_text(),
+    res = results(logs, Path(a.firmware_log).read_text() if a.firmware_log else None,
                   Path(a.integration_log).read_text() if a.integration_log else None)
+    for j in a.junit:
+        res.update(junit_results(Path(j)))
     errors = []
 
     kind = lambda i: i['test_id'].split('-')[0]

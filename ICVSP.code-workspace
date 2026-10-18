@@ -1,0 +1,18 @@
+{
+  // Open this file in VS Code (File > Open Workspace from File) to get:
+  //   - Testing panel: every Python suite (engine, backend, simulation) via pytest, with "Run with Coverage"
+  //   - PlatformIO: the firmware project, its native unit tests under PlatformIO > native > Advanced > Test
+  "folders": [
+    { "name": "ICVSP", "path": "." },
+    { "name": "firmware (PlatformIO)", "path": "firmware" }
+  ],
+  "settings": {
+    "python.testing.pytestEnabled": true,
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestArgs": [],
+    "files.exclude": { "**/__pycache__": true, "**/.pytest_cache": true }
+  },
+  "extensions": {
+    "recommendations": ["ms-python.python", "platformio.platformio-ide", "github.vscode-github-actions"]
+  }
+}
