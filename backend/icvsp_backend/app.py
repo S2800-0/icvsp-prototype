@@ -14,6 +14,8 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
+from icvsp.config import Config
+
 from .auth import ADMIN, AMBULANCE, DRIVER, Auth, Principal
 from .ratelimit import Limit, RateLimiter, limits_from_env
 from .service import Service
@@ -41,9 +43,10 @@ class BeaconIn(BaseModel):
 
 def create_app(store: Store | None = None, clock: Callable[[], float] = time.time,
                admin_token: str | None = None, jwt_secret: str | None = None,
-               rate_limits: dict[str, Limit | None] | None = None) -> FastAPI:
-    """`rate_limits` overrides single limits (e.g. {"reports_ip": None} when all callers share one address)."""
-    svc = Service(store or Store(os.environ.get("ICVSP_DB", "icvsp.sqlite3")))
+               rate_limits: dict[str, Limit | None] | None = None, engine_cfg: Config | None = None) -> FastAPI:
+    """`rate_limits` overrides single limits (e.g. {"reports_ip": None} when all callers share one address);
+    `engine_cfg` replaces the trust engine's settings (experiments, e.g. fleet slowing on or off)."""
+    svc = Service(store or Store(os.environ.get("ICVSP_DB", "icvsp.sqlite3")), engine_cfg)
     limiter = RateLimiter(limits_from_env(rate_limits), clock)
     auth = Auth(jwt_secret, admin_token, clock, limiter=limiter)
     is_admin = Depends(auth.require(ADMIN, admin_token_ok=True))      # Bearer admin, or legacy X-Admin-Token

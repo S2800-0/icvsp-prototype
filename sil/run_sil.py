@@ -34,6 +34,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 from icvsp_backend.app import create_app  # noqa: E402
 from icvsp_backend.auth import issue_dev_token  # noqa: E402
 from icvsp_backend.store import Store  # noqa: E402
+from icvsp.config import Config  # noqa: E402
 from icvsp.model import from_iso  # noqa: E402
 
 FW = ROOT / "firmware"
@@ -77,6 +78,45 @@ CAMERAS = {
 }
 FALSE_JOLT_PER_CAR = 0.05      # honest device, false pothole report (e.g. a manhole cover) per drive
 FALSE_BOX_PER_KM = 0.5         # static false camera boxes (kerb, shadow); the device logic should reject them
+# Driver behaviour in the position messages (fleet slowing, FR-28): drivers brake for a speed bump, some brake for
+# a pothole, and some slow down or stop at crossings where there is no hazard (one crossing is exactly where the
+# attackers place their fake speed bump). Only the reported speed changes; positions keep the constant-speed path.
+CROSSINGS = [(2400, "E"), (1400, "W")]
+BRAKE_HALF_WIDTH_M = 40.0
+
+
+def brake_plan(car: "Vehicle", seed: int) -> list[tuple[float, float]]:
+    """(position along the car's path, lowest speed factor) for every spot this car brakes at. Its own random
+    numbers (from its id and the seed), so the rest of the simulation draws exactly as before."""
+    rng = random.Random(zlib.crc32(f"{car.vid}-{seed}".encode()))
+    plan = []
+    for typ, pos, lane in HAZARDS:
+        if lane != car.direction:
+            continue
+        if typ == "speed_bump":
+            plan.append((car.travelled(pos), rng.uniform(0.25, 0.45)))
+        elif rng.random() < 0.5:
+            plan.append((car.travelled(pos), rng.uniform(0.5, 0.7)))
+    for pos, lane in CROSSINGS:
+        if lane != car.direction:
+            continue
+        r = rng.random()
+        if r < 0.5:
+            plan.append((car.travelled(pos), rng.uniform(0.3, 0.5)))   # slows down for people crossing
+        elif r < 0.7:
+            plan.append((car.travelled(pos), 0.0))                      # stops
+    return plan
+
+
+def braked_speed(v: float, travelled_m: float, plan: list[tuple[float, float]]) -> float:
+    f = 1.0
+    for at, low in plan:
+        d = abs(travelled_m - at)
+        if d < BRAKE_HALF_WIDTH_M:
+            f = min(f, low + (1 - low) * d / BRAKE_HALF_WIDTH_M)
+    return v * f
+
+
 WARN_CHECK_M = 300.0           # a vehicle asks for hazards when it is this far before each hazard
 MATCH_M = 15.0                 # a returned hazard matches a real one within this distance
 
@@ -223,7 +263,7 @@ class Run:
     events: list[tuple]
 
 
-def prepare(scn: Scenario, seed: int, utc0: float = UTC0, camera: str = "assumed") -> Run:
+def prepare(scn: Scenario, seed: int, utc0: float = UTC0, camera: str = "assumed", braking: bool = True) -> Run:
     rng = random.Random(seed)
     honest, attackers = plan(scn, rng, camera)
 
@@ -248,13 +288,15 @@ def prepare(scn: Scenario, seed: int, utc0: float = UTC0, camera: str = "assumed
                 events.append((t_up + rng.uniform(1, 5), "report", line))
         # 1 Hz position beacons from the phone, sent in 10 s batches
         dur = ROAD_M / car.v + 6
+        brakes = brake_plan(car, seed) if braking else []
         batch = []
         for k in range(int(dur)):
             if rng.random() < scn.faults.beacon_loss:
                 continue
             lat, lon = position(car.direction, min(car.v * k, ROAD_M))
             batch.append({"vehicle_id": car.vid, "t": utc0 + car.start + k, "lat": lat, "lon": lon,
-                          "speed_mps": car.v, "heading_deg": 90 if car.direction == "E" else 270})
+                          "speed_mps": braked_speed(car.v, car.v * k, brakes),
+                          "heading_deg": 90 if car.direction == "E" else 270})
             if len(batch) == 10 or k == int(dur) - 1:
                 t_up = car.start + k + 0.5
                 if scn.faults.outage and scn.faults.outage[0] <= t_up < scn.faults.outage[1]:
@@ -351,11 +393,12 @@ def apply(client, run: Run, t_rel: float, kind: str, payload, results: dict, que
     return None
 
 
-def simulate(scn: Scenario, seed: int, camera: str = "assumed") -> dict:
+def simulate(scn: Scenario, seed: int, camera: str = "assumed", fleet_slowing: bool = True) -> dict:
     clock = [UTC0]
     store = Store()
     client = TestClient(create_app(store, lambda: clock[0], admin_token="sil", jwt_secret=JWT,
-                                    rate_limits={"reports_ip": None}))   # all simulated phones share one address
+                                    rate_limits={"reports_ip": None},    # all simulated phones share one address
+                                    engine_cfg=Config(fleet_slowing=fleet_slowing)))
     run = prepare(scn, seed, camera=camera)
     results, queries = new_results(), []
     for t_rel, kind, payload in run.events:

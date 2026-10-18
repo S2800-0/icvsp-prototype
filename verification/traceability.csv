@@ -53,6 +53,16 @@ T-51,Unit,engine/tests/test_severity.py,SeverityScope.test_lone_minor_report_get
 T-52,Unit,engine/tests/test_severity.py,SeverityScope.test_threshold_is_configurable,FR-27
 T-53,Unit,engine/tests/test_scaling.py,SpatialShortcut.test_skipped_vehicles_could_never_have_passed,NFR-02 FR-12
 T-54,Integration,engine/tests/test_scaling.py,GridIndex.test_grid_index_gives_exactly_the_same_decisions,NFR-02 FR-09 FR-12
+T-55,Unit,engine/tests/test_fleet_slowing.py,BrakedAt.test_braking_for_a_bump_and_speeding_up_again,FR-28
+T-56,Unit,engine/tests/test_fleet_slowing.py,BrakedAt.test_steady_speed_is_not_braking,FR-28
+T-57,Unit,engine/tests/test_fleet_slowing.py,BrakedAt.test_a_full_stop_is_a_crossing_not_a_hazard,FR-28
+T-58,Unit,engine/tests/test_fleet_slowing.py,BrakedAt.test_a_jam_without_recovery_is_not_braking_for_a_hazard,FR-28
+T-59,Unit,engine/tests/test_fleet_slowing.py,BrakedAt.test_already_slow_traffic_is_not_counted,FR-28
+T-60,System,engine/tests/test_fleet_slowing.py,Decisions.test_passing_vehicles_that_braked_support_a_hazard_two_devices_reported,FR-28 FR-10
+T-61,System,engine/tests/test_fleet_slowing.py,Decisions.test_a_lone_report_gets_no_help_from_braking_traffic,FR-28 FR-12
+T-62,System,engine/tests/test_fleet_slowing.py,Decisions.test_slowing_weight_is_capped_at_the_reported_support,FR-28
+T-63,System,engine/tests/test_fleet_slowing.py,Decisions.test_stopping_traffic_still_counts_against_the_report,FR-28 FR-10
+T-64,Unit,engine/tests/test_fleet_slowing.py,Decisions.test_fleet_slowing_can_be_switched_off,FR-28
 F-01,Unit,firmware/test/test_bump_detector/test_main.cpp,test_speed_bump_is_detected_once_as_bump,FR-01
 F-02,Unit,firmware/test/test_bump_detector/test_main.cpp,test_pothole_is_detected_as_pothole,FR-01
 F-03,Unit,firmware/test/test_bump_detector/test_main.cpp,test_severity_follows_the_size_of_the_jolt,FR-01 FR-02

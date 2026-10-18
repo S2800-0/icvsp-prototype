@@ -78,6 +78,19 @@ slowing evidence.
   warnings; a hazard with a weak report plus fleet slowing reaches a warning sooner than without.
 - Measured in `sil/` first (warned in time, false warnings, all scenarios and 5 seeds), then on our own recordings.
 
+Result (18 Oct, `sil/results/fleet_slowing.md`, 5 seeds, braking drivers and two crossings, one at the fake bump):
+
+| Scenario | Warned, off → on | False warnings | Any false alert, off → on |
+|---|---|---|---|
+| All devices new | 74 % → 95 % | 0 % | 0 % → 2 % |
+| 30 % vetted fleet | 82 % → 97 % | 0 % | 3 % → 6 % |
+| Fleet + faults | 46 % → 71 % | 0 % | 2 % → 2 % |
+| Fleet + attacks | 72 % → 93 % | 0 % | 2 % → 2 % |
+
+First version let braking at a crossing lift one honest car's wrong pothole report to an advisory (attacks: 2 % → 11 %
+false alerts). Fixed: slowing only helps a hazard that at least two independent devices reported (requirement FR-28,
+proposed). Still to check on our own recordings: real braking behaviour, and whether 1 Hz speed is enough.
+
 ## 5. Expiry by type (`engine/icvsp/config.py`, `max_age_s` / `freshness_tau_s`)
 
 Already per type; values change and the new group is added:

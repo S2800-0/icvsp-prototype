@@ -50,6 +50,23 @@ class Config:
     cold_start_min_g: float = 0.8        # consistency needed, i.e. good GPS and plausible report
     expire_freshness: float = 0.1        # best supporting freshness below this → EXPIRED
 
+    # --- fleet slowing (supporting evidence only) ---
+    # Drivers brake for a speed bump or a pothole and speed up again right after. A vehicle that drove over a
+    # reported spot and did that is not counted against the hazard; it adds supporting weight instead. Its weight
+    # is capped at the hazard's own support, it is never an independent source, and it only helps a hazard that at
+    # least two independent devices reported: a lone (possibly wrong) report at a busy crossing gets no help from
+    # people braking there (found in the attack scenario, 18 Oct). A full stop (traffic light,
+    # crossing) and a long slow stretch with no recovery (a jam) are not counted. Starting values (18 Oct).
+    fleet_slowing: bool = True
+    slow_from_kmh: float = 20.0          # speed before the spot must be at least this
+    slow_drop: float = 0.35              # lowest speed near the spot at least 35 % below the speed before
+    slow_stop_kmh: float = 5.0           # lowest speed below this = a stop, not braking for a hazard
+    slow_recover: float = 0.5            # speed after must regain half of what was lost
+    slow_before_s: tuple = (4.0, 10.0)   # seconds before the pass: "speed before" (the highest in this window)
+    slow_near_s: float = 3.0             # +- seconds around the pass: "lowest speed near the spot"
+    slow_after_s: tuple = (3.0, 10.0)    # seconds after the pass: "speed after" (the highest in this window)
+    slow_confidence: float = 0.6         # how much one slowing pass is worth vs a detection
+
     # --- severity scope ---
     # ICVSP warns only about hazards big enough to make a driver stop, slow down or steer around them:
     # raised at least as high as a normal speed bump, or sunk at least as deep. The device measures this

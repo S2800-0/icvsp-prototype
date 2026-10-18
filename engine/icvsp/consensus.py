@@ -4,7 +4,8 @@ Steps inside Engine.decide():
   1. replay protection and plausibility checks on every event
   2. trust weight for every surviving event
   3. merge reports of the same hazard (type, place, direction)
-  4. find negative evidence: vehicles that drove over the spot, detector on, and said nothing
+  4. find negative evidence: vehicles that drove over the spot, detector on, and said nothing (unless they
+     braked there and sped up again: that supports the hazard instead, see Config.fleet_slowing)
   5. independence check: identities that move as one are counted once (Sybil defence)
   6. net evidence → hazard state, with a written reason for every step
 """
@@ -67,6 +68,7 @@ class Decision:
     reasons: list[str]
     sybil_suspected: bool = False
     severity: str = "unknown"         # largest measured severity among the reports, or "unknown" (camera only)
+    slowing: list[Evidence] = field(default_factory=list)  # vehicles that braked at the spot (supporting only)
 
     @property
     def action(self) -> str:
@@ -276,6 +278,7 @@ class Engine:
                            and distance_m(lat, lon, e.lat, e.lon) <= 3 * cfg.merge_radius_m + e.acc_m
                            and heading_diff(e.heading_deg, heading) <= cfg.heading_tol_deg}
         contra: list[Evidence] = []
+        slowing: list[Evidence] = []
         # only vehicles near the hazard, in the same order as self.traces (the order the evidence is summed in)
         for vid in sorted(set(self._vehicle_grid.near(lat, lon)), key=self._order.__getitem__):
             trace = self.traces[vid]
@@ -285,11 +288,16 @@ class Engine:
             if t_pass is None or t_pass < first_seen - cfg.pass_window_s:
                 continue
             g, _ = trace_consistency(trace, cfg)
+            if cfg.fleet_slowing and braked_at(trace, t_pass, cfg):
+                slowing.append(Evidence(vid, "slowing", Trust(c=cfg.slow_confidence, g=g, h=self.rep.score(vid),
+                                                              f=freshness(now - t_pass, head.type, cfg))))
+                continue
             contra.append(Evidence(vid, "contra", Trust(c=cfg.pass_confidence, g=g, h=self.rep.score(vid),
                                                         f=freshness(now - t_pass, head.type, cfg))))
 
         # independence: identities whose traces move as one are one source
-        groups = self._independence_groups(support) + self._independence_groups(contra)
+        groups = (self._independence_groups(support) + self._independence_groups(contra)
+                  + self._independence_groups(slowing))
         collapsed = [g for g in groups if len(g) > 1]
         sybil = False
         for g in collapsed:
@@ -310,8 +318,19 @@ class Engine:
             return sum(by_group.values()), len(by_group)
 
         sup_w, n_sources = total(support)
+        if slowing and n_sources < 2:
+            # a lone report gets no help from braking traffic (people brake at crossings too): the vehicles that
+            # braked count against it like any other pass-by, exactly as without fleet slowing
+            contra += [Evidence(e.source, "contra", Trust(c=cfg.pass_confidence, g=e.trust.g, h=e.trust.h, f=e.trust.f),
+                                group=e.group) for e in slowing]
+            slowing = []
         con_w, n_contra = total(contra)
-        net = sup_w - cfg.lam * con_w
+        slow_w, n_slow = total(slowing)
+        slow_w = min(slow_w, sup_w)          # supporting only: at most doubles what the devices reported
+        net = sup_w + slow_w - cfg.lam * con_w
+        if slowing:
+            reasons.append(f"{n_slow} independent vehicle(s) braked at the spot and sped up again: +{slow_w:.2f} "
+                           f"(supporting only, not a source)")
         if contra:
             reasons.append(f"{n_contra} independent vehicle(s) drove over the spot with the detector on and "
                            f"reported nothing: −{cfg.lam * con_w:.2f}")
@@ -340,7 +359,7 @@ class Engine:
 
         return Decision(hid, head.type, lat, lon, heading, head.road_segment, first_seen, state, net,
                         n_sources, support, contra, [[e.source for e in g] for g in collapsed], reasons, sybil,
-                        severity)
+                        severity, slowing)
 
     def _severity_scope(self, state: HazardState, best: dict[str, Scored]) -> tuple[str, HazardState, str | None]:
         """Only hazards that make a driver stop, slow down or swerve are warned about (Config.warn_min_severity).
@@ -493,6 +512,22 @@ def pass_time(trace: list[Beacon], lat: float, lon: float, heading: float, cfg: 
             frac = -a_along / (b_along - a_along) if b_along != a_along else 0.0
             return a.t + frac * (b.t - a.t)
     return None
+
+
+def braked_at(trace: list[Beacon], t_pass: float, cfg: Config) -> bool:
+    """True if the vehicle braked sharply around t_pass and sped up again (Config.fleet_slowing): its highest speed
+    before the spot, its lowest speed near it and its highest speed after it, from the 1 Hz position messages. A
+    full stop or a slow stretch without recovery (a jam) is not braking for a hazard."""
+    def speeds(lo: float, hi: float) -> list[float]:
+        return [b.speed_mps for b in trace if lo <= b.t - t_pass <= hi]
+    before = speeds(-cfg.slow_before_s[1], -cfg.slow_before_s[0])
+    near = speeds(-cfg.slow_near_s, cfg.slow_near_s)
+    after = speeds(cfg.slow_after_s[0], cfg.slow_after_s[1])
+    if not (before and near and after):
+        return False
+    v0, vmin, v1 = max(before), min(near), max(after)
+    return (v0 * 3.6 >= cfg.slow_from_kmh and vmin <= (1 - cfg.slow_drop) * v0
+            and vmin * 3.6 >= cfg.slow_stop_kmh and v1 - vmin >= cfg.slow_recover * (v0 - vmin))
 
 
 def _mean_separation(a: list[Beacon], b: list[Beacon], min_overlap: int = 1) -> float | None:
