@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: bash      # bash -eo pipefail: a failing command fails the step even when its output is piped to tee
+
 jobs:
   # ---- left side of the V is the requirements and design; these jobs are the right side, one per level ----
   unit-firmware:
@@ -86,7 +90,11 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - run: pip install cryptography
+      - uses: actions/cache@v5
+        with:
+          path: ~/.platformio
+          key: platformio-${{ runner.os }}-${{ hashFiles('firmware/platformio.ini') }}
+      - run: pip install platformio cryptography
       - name: Reports signed by the device code, checked by an independent library
         working-directory: firmware
         run: python tools/check_with_engine.py | tee ../integration.log
