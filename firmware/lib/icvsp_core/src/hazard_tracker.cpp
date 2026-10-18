@@ -24,7 +24,7 @@ bool HazardTracker::on_road(const CamDetection& d) const {
     return cy >= cfg_.road_top;  // the road is the lower part of the image, facing forward or backward
 }
 
-bool HazardTracker::moves_like_fixed_object(const Track& tr) const {
+bool HazardTracker::moves_like_fixed_object(const Track& tr, float speed_kmh) const {
     if (tr.n_points < cfg_.k_hits || tr.n_points < 2) return false;
     const Point& a = tr.points[0];
     const Point& b = tr.points[tr.n_points - 1];
@@ -41,17 +41,23 @@ bool HazardTracker::moves_like_fixed_object(const Track& tr) const {
     const double n = tr.n_points, den = n * stt - st * st;
     const double rate = den > 0 ? dir * (n * sty - st * sy) / den : 0.0;
     const bool size_ok = cfg_.rear_camera ? b.w <= a.w : b.w >= a.w;
-    return drop >= cfg_.min_drop && rate >= cfg_.min_rate && size_ok;
+    if (drop >= cfg_.min_drop && rate >= cfg_.min_rate && size_ok) return true;
+    // a still box (the car brakes for the bump): accepted only with braking or a jolt, never moving the wrong way
+    if (drop < -cfg_.min_drop) return false;
+    const bool braking = tr.speed_first_kmh > 0 && speed_kmh <= (1.0f - cfg_.slow_frac) * tr.speed_first_kmh;
+    const bool jolt = has_jolt_ && last_jolt_ms_ + cfg_.jolt_window_ms >= tr.t_first_ms &&
+                      last_jolt_ms_ <= tr.t_last_ms + cfg_.jolt_window_ms;
+    return braking || jolt;
 }
 
-bool HazardTracker::confirmed(const Track& tr) const {
+bool HazardTracker::confirmed(const Track& tr, float speed_kmh) const {
     const uint32_t window = cfg_.n_frames >= 32 ? 0xFFFFFFFFu : ((1u << cfg_.n_frames) - 1);
     const int hits = popcount(tr.hit_frames & window);
     // potholes: k_hits frames, or fewer when the track's best box is confident (they pass a forward camera fast)
     const bool short_pothole = tr.type == HazardType::Pothole && cfg_.pothole_k_hits > 0 &&
                                hits >= cfg_.pothole_k_hits && tr.max_conf >= cfg_.pothole_min_peak_conf;
     if (hits < cfg_.k_hits && !short_pothole) return false;
-    if (tr.type == HazardType::SpeedBump && !moves_like_fixed_object(tr)) return false;
+    if (tr.type == HazardType::SpeedBump && !moves_like_fixed_object(tr, speed_kmh)) return false;
     return true;
 }
 
@@ -100,6 +106,7 @@ size_t HazardTracker::update(uint32_t t_ms, float speed_kmh, const CamDetection*
             tracks_[slot].used = true;
             tracks_[slot].type = d.type;
             tracks_[slot].t_first_ms = t_ms;
+            tracks_[slot].speed_first_kmh = speed_kmh;
             match = slot;
         }
         Track& tr = tracks_[match];
@@ -115,7 +122,7 @@ size_t HazardTracker::update(uint32_t t_ms, float speed_kmh, const CamDetection*
     size_t emitted = 0;
     if (speed_kmh < cfg_.min_speed_kmh) return 0;
     for (Track& tr : tracks_) {
-        if (!tr.used || tr.reported || emitted >= cap || !confirmed(tr)) continue;
+        if (!tr.used || tr.reported || emitted >= cap || !confirmed(tr, speed_kmh)) continue;
         tr.reported = true;
         out[emitted++] = CameraHazard{tr.type, tr.t_first_ms, t_ms, tr.max_conf, tr.hits, tr.cx, tr.cy};
     }

@@ -20,7 +20,11 @@ namespace icvsp {
 //   4. for speed bumps, the track moves like an object fixed to the road (motion check): with a forward
 //      camera it moves down the image and does not shrink as the car approaches; with a rear camera it
 //      moves up and does not grow as the car drives away. Moved at least `min_drop` image heights in
-//      total, at at least `min_rate` image heights per second (least-squares slope);
+//      total, at at least `min_rate` image heights per second (least-squares slope). Drivers brake for a
+//      bump, so the box can stop moving: a still box (not moving the wrong way) is also accepted when the
+//      car slowed by at least `slow_frac` since the track started, or the IMU felt a jolt within
+//      `jolt_window_ms` of the track (note_jolt). At steady speed with no jolt, a still box stays rejected
+//      (kerbs, parked cars);
 //   5. the car is moving (at least `min_speed_kmh`).
 // Each track is reported once. The motion check and the road check apply to speed bumps only: they
 // were tested on bumps, and pothole false alarms lie on the road and barely move differently.
@@ -59,6 +63,10 @@ struct TrackerConfig {
     float pothole_min_peak_conf = 0.40f;
     float min_drop = 0.03f;
     float min_rate = 0.02f;       // image heights per second
+    // still bump box accepted when the car is braking or the IMU felt it (set before scoring, 18 Oct;
+    // provisional until our own recordings: YouTube videos have no speed or IMU, so they cannot check it)
+    float slow_frac = 0.20f;      // speed at least 20 % below the speed when the track started
+    uint32_t jolt_window_ms = 1500;
     float min_speed_kmh = 8.0f;
 };
 
@@ -76,6 +84,9 @@ public:
 
     size_t active_tracks() const;
 
+    // The IMU detected a bump or pothole at t_ms (called by the device): lets a still bump box count.
+    void note_jolt(uint32_t t_ms) { last_jolt_ms_ = t_ms; has_jolt_ = true; }
+
 private:
     struct Point { uint32_t t_ms; float cy, w; };
     struct Track {
@@ -85,6 +96,7 @@ private:
         float cx, cy;            // last centre
         float max_conf;
         uint32_t t_first_ms, t_last_ms;
+        float speed_first_kmh;   // car speed when the track started
         uint32_t hit_frames;     // bit i set = detected i frames ago
         uint16_t hits;
         uint8_t n_points;
@@ -92,11 +104,13 @@ private:
     };
 
     bool on_road(const CamDetection& d) const;
-    bool moves_like_fixed_object(const Track& tr) const;
-    bool confirmed(const Track& tr) const;
+    bool moves_like_fixed_object(const Track& tr, float speed_kmh) const;
+    bool confirmed(const Track& tr, float speed_kmh) const;
 
     TrackerConfig cfg_;
     Track tracks_[kMaxTracks] = {};
+    uint32_t last_jolt_ms_ = 0;
+    bool has_jolt_ = false;
 };
 
 }  // namespace icvsp

@@ -1,4 +1,4 @@
-# Labelling policy (potholes and speed bumps)
+# Labelling policy (speed bumps and road damage)
 
 One set of rules for everyone who labels data for the ICVSP detector, and for deciding whether a public dataset
 can be used. The detector only has to find hazards the system warns about (FR-27): ones that make a driver
@@ -13,6 +13,10 @@ can be used. The detector only has to find hazards the system warns about (FR-27
 
 ## 2. The two classes
 
+The model learns two classes. Each box also gets a **subtype** (a CVAT attribute, section 2.3), so we can measure which
+kinds are missed without changing the classes. The driver sees two messages: *Speed bump ahead* (`speed_bump`, and dips
+found by the IMU) and *Road damage ahead* (`pothole`).
+
 ### speed_bump
 
 A raised hump across the lane that makes a car slow down: **marked or unmarked**, asphalt, concrete, rubber or
@@ -25,41 +29,68 @@ Do **not** label as a speed bump:
 - rumble strips (rows of small ridges)
 - flat road joints or level crossings
 - kerbs, traffic islands, steps
-- manhole covers
+- manhole covers (a raised cover is `pothole`, subtype `manhole`)
+- **dips** (the road goes down across the lane): never boxed. The camera can barely see them; the IMU and fleet
+  slowing find them. Tag them with `D` in `tools/review.html`.
 
-### pothole
+Subtype: `built` (made as a speed bump, marked or not) or `informal` (a hump people made themselves, dirt, rope,
+pipes).
 
-A hole or sunken area in the driving lane, deep or wide enough that a driver would slow down or steer around it.
-Signs of this:
+### pothole (road damage)
+
+Damage in the driving lane that makes a driver slow down or steer around it. Three kinds, all labelled `pothole`:
+
+| Subtype | What it is |
+|---|---|
+| `hole` | a hole or sunken area with broken edges |
+| `manhole` | a manhole or drain cover that is **sunken, raised, broken, open or missing** |
+| `broken_surface` | crushed or crumbling asphalt, a failed patch: no clean hole, but a car slows down for it |
+
+Signs that it is in scope:
 - broken edges
 - a dark inside or shadow showing depth
 - about a wheel's width or more
 
 Water-filled potholes count if their edges are clear.
 
-Label it: one tight box around the hole's edges, not the cracks around it. Two separate holes get two boxes; holes
-that run together get one.
+Label it: one tight box around the hole's edges (or the cover, or the broken stretch in the lane), not the cracks
+around it. Two separate holes get two boxes; holes that run together get one. A long broken stretch gets one box per
+lane width of road that is visible.
 
 Do **not** label as a pothole:
 - cracks, including alligator cracking
-- patched or repaired areas level with the road
+- patched or repaired areas **level** with the road (a broken patch is `broken_surface`)
 - stains, wet patches, oil, shadows
-- manholes and drain grates
-- gravel or unpaved road surface
+- manholes and drain grates **level** with the road (flush covers are everywhere: boxing them floods drivers with
+  warnings)
+- a dirt or gravel road that is unpaved everywhere (there is no damage to warn about); broken asphalt is
+  `broken_surface`
 - shallow surface wear that a car would just drive over
+
+### 2.3 Subtypes and frame tags in CVAT
+
+Set these up once in the CVAT project (*Project → Labels*):
+- on `speed_bump`: attribute `subtype`, values `built`, `informal`
+- on `pothole`: attribute `subtype`, values `hole`, `manhole`, `broken_surface`
+- frame tags (*Tag* labels): `unsure` and `debris`
+
+`debris` (rubble, rocks, objects on the road) is tagged on the frame but not boxed: there are too few examples to
+train it yet, and debris moves, so a warning would expire within hours.
 
 ## 3. When you are not sure
 
 - **Never leave a hazard unboxed in a frame you keep.** An unboxed hazard teaches the model that hazards are
   background.
-- If you cannot tell whether something is in scope (too far, too dark, half hidden), mark the **whole frame as
-  "unsure"**. It is left out of training.
+- If you cannot tell whether something is in scope (too far, too dark, half hidden), give the frame the
+  **`unsure` tag**. It is left out of training.
+- The YOLO export drops frame tags, so export each task **twice**: *Ultralytics YOLO Detection 1.0* (boxes) and
+  *CVAT for images 1.1* (tags and subtypes). `scripts/package_cvat.py` reads both and leaves `unsure` frames out.
 - A hazard cut off at the frame edge: label it if more than half is visible, otherwise mark the frame "unsure".
 
 ## 4. Hard negatives (keep these, with no boxes)
 
 Frames with **no hazard**, especially things that look like one, are valuable:
-- manholes and drain grates
+- manholes and drain grates **level** with the road
 - shadows across the road
 - patches, puddles and painted lines
 - kerbs and traffic islands
@@ -89,7 +120,7 @@ with speed bumps only. Decisions so far:
 | Dataset | Decision | Why |
 |---|---|---|
 | SBP-YOLO | Used, keeps the public test split | Baseline |
-| PotHoleNet | Used; manhole class excluded | Dashcam view, consistent boxes; manholes become hard negatives |
+| PotHoleNet | Used; manhole class excluded | Dashcam view, consistent boxes; its manholes are mostly flush covers, so they stay hard negatives (spot-check 50 for sunken ones) |
 | Indian Roads | Speed bumps only (v5) | Its pothole images are ground-level photos of rough patches |
 | BharatPothole | Not used (v5) | Many tiny, shallow marks labelled as potholes: below scope, inconsistent |
 
@@ -104,4 +135,7 @@ with speed bumps only. Decisions so far:
 
 - A second person checks a random 10% of each batch.
 - Every disagreement is settled and, if needed, added to this policy as an example.
-- Use the existing tools: CVAT for boxes, `tools/review.html` for tagging events in video. Export in YOLO format.
+- Use the existing tools: CVAT for boxes, `tools/review.html` for tagging events in video (B bump, H pothole,
+  Shift = minor, D dip). Export as in section 3.
+- Policy changes apply to old frames too: when a rule changes, the frames we told the model are background are
+  re-checked (18 Oct: sunken manholes and broken surface, see `.plans/hazard-taxonomy-spec.md`).

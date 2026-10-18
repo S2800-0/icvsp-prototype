@@ -28,6 +28,15 @@ std::vector<CameraHazard> run(HazardTracker& tr, const std::vector<CamDetection>
     return found;
 }
 
+// Same, with a car speed per frame (a driver braking for the bump).
+size_t run_speeds(HazardTracker& tr, const std::vector<CamDetection>& per_frame, const std::vector<float>& speed) {
+    size_t total = 0;
+    CameraHazard out[4];
+    for (size_t f = 0; f < per_frame.size(); ++f)
+        total += tr.update(static_cast<uint32_t>(1000 + f * kFrameMs), speed[f], &per_frame[f], 1, out, 4);
+    return total;
+}
+
 // A speed bump seen by the rear camera: moves up the image and shrinks as the car drives away.
 std::vector<CamDetection> receding_bump(int frames) {
     std::vector<CamDetection> v;
@@ -110,6 +119,38 @@ void test_forward_camera_expects_the_opposite_motion() {
     TEST_ASSERT_EQUAL(0, run(fwd2, receding_bump(6), std::vector<bool>(6, true)).size());
 }
 
+void test_still_bump_box_counts_when_the_car_brakes() {
+    // drivers slow down at a bump, so its box stops moving; braking from 40 to 25 km/h lets it count
+    HazardTracker tr;
+    std::vector<CamDetection> v(8, box(HazardType::SpeedBump, 0.5f, 0.75f, 0.2f));
+    TEST_ASSERT_EQUAL(1, run_speeds(tr, v, {40, 38, 35, 32, 29, 27, 25, 25}));
+}
+
+void test_still_bump_box_counts_after_an_imu_jolt() {
+    HazardTracker tr;
+    tr.note_jolt(1200);  // the IMU felt the bump while the box was in view
+    std::vector<CamDetection> v(8, box(HazardType::SpeedBump, 0.5f, 0.75f, 0.2f));
+    TEST_ASSERT_EQUAL(1, run(tr, v, std::vector<bool>(8, true)).size());
+}
+
+void test_an_old_jolt_does_not_make_a_kerb_a_bump() {
+    HazardTracker tr;
+    tr.note_jolt(1000);
+    std::vector<CamDetection> v(8, box(HazardType::SpeedBump, 0.3f, 0.75f, 0.2f));
+    CameraHazard out[4];
+    size_t total = 0;
+    for (int f = 0; f < 8; ++f) total += tr.update(10000 + f * kFrameMs, 40, &v[f], 1, out, 4);  // 9 s later
+    TEST_ASSERT_EQUAL(0, total);
+}
+
+void test_braking_does_not_rescue_a_box_moving_the_wrong_way() {
+    // rear camera, box moves down and grows (a vehicle catching up) while the car brakes: still rejected
+    HazardTracker tr;
+    std::vector<CamDetection> v;
+    for (int f = 0; f < 6; ++f) v.push_back(box(HazardType::SpeedBump, 0.5f, 0.6f + 0.04f * f, 0.1f + 0.02f * f));
+    TEST_ASSERT_EQUAL(0, run_speeds(tr, v, {40, 36, 32, 28, 25, 22}));
+}
+
 void test_bump_outside_the_road_region_is_ignored() {
     // rear camera: the road is the lower part of the image; a box near the top (e.g. on a building) is ignored
     HazardTracker tr;
@@ -169,6 +210,10 @@ int main(int, char**) {
     RUN_TEST(test_static_bump_box_like_a_kerb_is_rejected);
     RUN_TEST(test_bump_moving_the_wrong_way_is_rejected);
     RUN_TEST(test_forward_camera_expects_the_opposite_motion);
+    RUN_TEST(test_still_bump_box_counts_when_the_car_brakes);
+    RUN_TEST(test_still_bump_box_counts_after_an_imu_jolt);
+    RUN_TEST(test_an_old_jolt_does_not_make_a_kerb_a_bump);
+    RUN_TEST(test_braking_does_not_rescue_a_box_moving_the_wrong_way);
     RUN_TEST(test_bump_outside_the_road_region_is_ignored);
     RUN_TEST(test_road_mask_overrides_the_region_when_available);
     RUN_TEST(test_low_confidence_boxes_are_ignored);

@@ -35,7 +35,10 @@ const GnssFix& Device::fix_at(uint32_t t_ms) const {
 void Device::on_imu(const ImuSample& s, const GnssFix& fix) {
     remember(s.t_ms, fix);
     Detection d;
-    if (imu_detector_.update(s, fix.speed_kmh, d)) fusion_.add_imu(d);
+    if (imu_detector_.update(s, fix.speed_kmh, d)) {
+        fusion_.add_imu(d);
+        camera_.note_jolt(d.t_ms);  // a still bump box seen around this jolt can now be confirmed
+    }
     emit(s.t_ms, false);
 }
 

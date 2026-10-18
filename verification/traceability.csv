@@ -93,6 +93,10 @@ F-37,Unit,firmware/test/test_hazard_tracker/test_main.cpp,test_two_separate_poth
 F-38,Unit,firmware/test/test_hazard_tracker/test_main.cpp,test_a_gap_longer_than_allowed_starts_a_new_track,FR-01 NFR-03
 F-53,Unit,firmware/test/test_hazard_tracker/test_main.cpp,test_a_confident_pothole_seen_in_two_frames_is_confirmed,FR-01 NFR-03
 F-54,Unit,firmware/test/test_hazard_tracker/test_main.cpp,test_two_frames_are_not_enough_for_a_speed_bump,FR-01 NFR-03
+F-55,Unit,firmware/test/test_hazard_tracker/test_main.cpp,test_still_bump_box_counts_when_the_car_brakes,FR-01 NFR-03
+F-56,Unit,firmware/test/test_hazard_tracker/test_main.cpp,test_still_bump_box_counts_after_an_imu_jolt,FR-01 NFR-03
+F-57,Unit,firmware/test/test_hazard_tracker/test_main.cpp,test_an_old_jolt_does_not_make_a_kerb_a_bump,FR-01 NFR-03
+F-58,Unit,firmware/test/test_hazard_tracker/test_main.cpp,test_braking_does_not_rescue_a_box_moving_the_wrong_way,FR-01 NFR-03
 F-39,Unit,firmware/test/test_replay_guard/test_main.cpp,test_fresh_message_is_accepted_once,FR-06 FR-SEC-10
 F-40,Unit,firmware/test/test_replay_guard/test_main.cpp,test_same_id_from_another_sender_is_a_different_message,FR-06 FR-SEC-10
 F-41,Unit,firmware/test/test_replay_guard/test_main.cpp,test_old_messages_are_stale,FR-06 FR-SEC-10

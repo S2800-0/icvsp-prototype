@@ -55,3 +55,6 @@ verification/out/
 .coverage
 htmlcov/
 .pytest_cache/
+
+# team recordings: faces and plates, never committed
+ai/data/team_clips/
