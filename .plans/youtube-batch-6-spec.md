@@ -99,3 +99,21 @@ Otherwise the current model stays, and the results are recorded in `ai/results/e
 ## Open
 
 - Date of the next mentor meeting, which sets the exact deadline.
+
+## Result: YOLO v6 (18 Oct)
+
+Scored with `firmware/tools/score_logic.py` (device logic, forward camera, 15 fps) on the four held-out Cairo videos
+(night, day, test 14, test 15; 90 minutes, 29 tagged hazards). Full table: `firmware/results/logic_accuracy.md`.
+
+| Rule | v5 | v6 | Pass? |
+|---|---|---|---|
+| 1. Hazards found (device logic) | 7 / 29 | 10 / 29 | yes |
+| 2. False reports per minute | 1.34 | 1.41 | **no** (about 6 more false reports in 90 min) |
+| 3. Public SBP test mAP50 | 0.841 | 0.843 | yes |
+
+Decision, by the rule fixed before the results: **v5 stays.** v6 finds more (the gain is night potholes: test 14
+from 2 to 6 of 7), but it also reports slightly more false hazards.
+
+Found while scoring: with the device logic, **no speed bump is confirmed by any model on any test video** (0 of 14);
+raw detections find some. The bump rule in the tracker (frames needed plus the motion check) is the bottleneck, not
+the model. Next: check the bump rule on these videos, then score again, using a video not used to tune it.

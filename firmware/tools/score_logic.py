@@ -23,9 +23,13 @@ BIN = FW / '.pio' / 'replay_detections'
 VIDEOS = [  # name, minutes, events file, detection folder prefix
     ('Night (Cairo, held out)', 10, AI / 'data/egypt_test/external/events_cairo.csv', 'cairo'),
     ('Day (Cairo, held out)', 18, AI / 'data/egypt_test/external/events_cairo_yt_02.csv', 'day'),
+    # YouTube batch 6 test videos: severe hazards only were tagged (FR-27 scope)
+    ('Night (Cairo, test 14)', 27.2, AI / 'data/tags/cairo_yt_14_night_test_events.csv', 'n14'),
+    ('Day (Cairo, test 15)', 24.9, AI / 'data/tags/cairo_yt_15_day_test_events.csv', 'd15'),
 ]
 MODELS = [('YOLO11n v3c (reference)', 'v3c'), ('YOLO11n v4, epoch 80 (+ public Kaggle data)', 'v4last'),
           ('YOLO11n v5, epoch 80 (curated public data)', 'v5last'),
+          ('YOLO11n v6, epoch 80 (v5 + YouTube batch 6)', 'v6last'),
           ('YOLO11n v4, epoch 1 (saved as best)', 'v4'),
           ('ESPDet-Pico (chip model)', 'espdet224'), ('ESPDet-Pico v5 (chip model, curated data)', 'espdet224v5')]
 
@@ -73,6 +77,15 @@ def main():
         b, p = rec['speed_bump'], rec['pothole']
         lines.append(f'| {v} | {m} | {label} | {b[0]} / {b[1]} | {false["speed_bump"] / minutes:.2f} | '
                      f'{p[0]} / {p[1]} | {false["pothole"] / minutes:.2f} |')
+    # all test videos together, with the device logic: the decision rule of YouTube batch 6 (.plans/)
+    lines += ['', '## All test videos together, with device logic', '',
+              '| Model | Hazards found | False reports / min | Videos |', '|---|---|---|---|']
+    for _, mname in sorted({(m, m) for _, m, *_ in rows}):
+        sel = [r for r in rows if r[1] == mname and r[2] == 'with device logic']
+        found = sum(r[3][c][0] for r in sel for c in ('speed_bump', 'pothole'))
+        total = sum(r[3][c][1] for r in sel for c in ('speed_bump', 'pothole'))
+        fpm = sum(r[4][c] for r in sel for c in ('speed_bump', 'pothole')) / max(1e-9, sum(r[5] for r in sel))
+        lines.append(f'| {mname} | {found} / {total} | {fpm:.2f} | {len(sel)} |')
     out = FW / 'results' / 'logic_accuracy.md'
     out.parent.mkdir(exist_ok=True)
     out.write_text('\n'.join(lines) + '\n')
