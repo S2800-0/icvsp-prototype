@@ -121,13 +121,27 @@ def main() -> int:
             return 'Recorded (experiment / inspection)'
         return 'Pass'
 
+    def coverage(tests):
+        """Covered = implemented, integrated, tested and passed: every automated test passes and at least one of
+        them exercises the requirement with the parts working together (integration or system level)."""
+        auto = [t for t in tests if t['result'] in ('Pass', 'Fail', 'Not run')]
+        if not auto or any(t['result'] != 'Pass' for t in auto):
+            return 'Not covered'
+        if any(t['v_level'] in ('Integration', 'System') for t in auto):
+            return 'Covered'
+        return 'Unit-tested only'
+
+    LEVELS = (('Unit', 'Unit'), ('Integration', 'Int.'), ('System', 'Sys.'))
     counts = defaultdict(lambda: defaultdict(int))
     rows = []
     for rid, r in reqs.items():
-        v = verdict(by_req.get(rid, []))
+        tests = by_req.get(rid, [])
+        v, c = verdict(tests), coverage(tests)
         counts[r['set']][v] += 1
-        ids = ', '.join(t['test_id'] for t in by_req.get(rid, []))
-        rows.append(f"| {rid} | {r['priority']} | {v} | {ids} |")
+        counts[r['set']][c] += 1
+        ids = ', '.join(t['test_id'] for t in tests)
+        lv = ' | '.join(str(sum(1 for t in tests if t['v_level'] == L and t['result'] == 'Pass')) or '' for L, _ in LEVELS)
+        rows.append(f"| {rid} | {r['priority']} | {v} | {lv} | {c} | {ids} |")
 
     n_auto = sum(1 for i in items if kind(i) in ('T', 'F', 'B', 'S', 'IT'))
     n_pass = sum(1 for i in items if i['result'] == 'Pass')
@@ -139,11 +153,18 @@ def main() -> int:
     for s in ('system', 'security'):
         c = counts[s]
         lines.append(f"| {s} | {c['Pass']} | {c['Recorded (experiment / inspection)']} | {c['Fail']} | {c['Not verified']} |")
-    lines += ['', '| Requirement | Priority | Result | Verified by |', '|---|---|---|---|', *rows]
+    lines += ['', 'Covered = implemented, integrated, tested and passed: all automated tests pass and at least one runs '
+              'at integration or system level. Every automated test also runs on GitHub Actions on each push.', '',
+              '| Requirement set | Covered | Unit-tested only | Not covered |', '|---|---|---|---|']
+    for s in ('system', 'security'):
+        c = counts[s]
+        lines.append(f"| {s} | {c['Covered']} | {c['Unit-tested only']} | {c['Not covered']} |")
+    lines += ['', '| Requirement | Priority | Result | Unit | Int. | Sys. | Covered | Verified by |',
+              '|---|---|---|---|---|---|---|---|', *rows]
     if errors:
         lines += ['', '## Problems', '', *[f'- {e}' for e in errors]]
     Path(a.out).write_text('\n'.join(lines) + '\n')
-    print('\n'.join(lines[:8]))
+    print('\n'.join(lines[:15]))
     for e in errors:
         print('ERROR:', e, file=sys.stderr)
     return 1 if errors else 0

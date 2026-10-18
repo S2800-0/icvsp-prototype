@@ -82,12 +82,16 @@ class SignIn(AuthBase):
     def test_no_secret_configured_refuses_every_token(self):
         with mock.patch.dict(os.environ, {}, clear=False):
             os.environ.pop("SUPABASE_JWT_SECRET", None)
-            client = TestClient(create_app(Store(), lambda: T0, admin_token="test-admin"))
+            store = Store()
+            self.addCleanup(store.close)
+            client = TestClient(create_app(store, lambda: T0, admin_token="test-admin"))
         self.assertEqual(client.get("/hazards", params=HAZ, headers=bearer()).status_code, 401)
 
     def test_secret_is_read_from_the_environment(self):
         with mock.patch.dict(os.environ, {"SUPABASE_JWT_SECRET": "env-secret"}):
-            client = TestClient(create_app(Store(), lambda: T0, admin_token="test-admin"))
+            store = Store()
+            self.addCleanup(store.close)
+            client = TestClient(create_app(store, lambda: T0, admin_token="test-admin"))
         ok = client.get("/hazards", params=HAZ, headers=bearer(secret="env-secret"))
         self.assertEqual(ok.status_code, 200)
         self.assertEqual(client.get("/hazards", params=HAZ, headers=bearer()).status_code, 401)

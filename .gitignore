@@ -51,3 +51,4 @@ ai/models/*_esp32s3.json
 # unfinished browser downloads
 *.crdownload
 *.part
+verification/traceability_report.md

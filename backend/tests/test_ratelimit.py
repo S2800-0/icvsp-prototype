@@ -97,7 +97,9 @@ class Api(unittest.TestCase):
         self.assertEqual(self.client.get("/hazards", params={"lat": 30, "lon": 31}, headers=user("car-a")).status_code, 200)
 
     def test_unsigned_junk_flood_is_stopped_by_address(self):
-        client = TestClient(create_app(Store(), self.clock, admin_token="test-admin", jwt_secret=JWT,
+        store = Store()
+        self.addCleanup(store.close)
+        client = TestClient(create_app(store, self.clock, admin_token="test-admin", jwt_secret=JWT,
                                        rate_limits={"reports_ip": Limit(6, 2)}))
         codes = [client.post("/reports", content=b"junk").status_code for _ in range(3)]
         self.assertEqual(codes, [400, 400, 429])
