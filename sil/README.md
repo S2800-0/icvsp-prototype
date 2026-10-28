@@ -62,14 +62,18 @@ group) so the answer of the backend and the trust engine can be shown live.
 ## BLE link model (`ble_link.py`, opt-in scenario `ble_fragmented`)
 
 The default scenarios treat the device-to-phone Bluetooth link as one coin flip per report (`ble_loss`). A real link is
-not like that: a signed report is about 700 bytes, but one BLE notification carries `ATT_MTU - 3` bytes (20 at the
-default MTU 23, about 180 to 240 once the MTU is negotiated), so every report travels as 3 to 45 fragments and is lost
-if any fragment is. `ble_link.py` models fragmenting and re-assembly, per-fragment loss, delay (connection events),
-link drops with a bounded device queue, a message-level ack with retries, and duplicates when the ack is lost.
+not like that: a signed report is about 700 bytes, but one BLE notification carries `min(ATT_MTU - 3, 512)` bytes (20 at
+the default MTU 23; phones can negotiate up to 517), so every report travels as 2 to 45 fragments and is complete only
+when all arrive. `ble_link.py` models fragmenting and re-assembly, connection events with a shared capacity (several
+reports queue behind each other), a message-level ack with retries, partial fragments kept across attempts, link drops
+with a bounded device queue, and duplicates when an ack is lost.
 
     python3 sil/run_sil.py --scenario ble_fragmented     # not part of `--scenario all` (keeps the recorded results)
     python3 -m pytest sil/test_ble_link.py -v
 
-At 2 % fragment loss the report loss per attempt is about 60 % at MTU 23 (45 fragments) and about 6 % at MTU 247 (3
-fragments): negotiate a large MTU and let the device retry. This is a model of the radio, not a radio test: no
-Bluetooth hardware or stack is involved, and the real transport (GATT service, Flutter client) is still to be built.
+Honest limits: BLE's link layer acknowledges and retransmits data, so real application losses come from connection
+drops, buffer overflow and stack errors, not from independent fragment erasure. `fragment_loss` is therefore a
+synthetic stress parameter (default 0), and "2 % fragment loss gives about 60 % report loss at MTU 23" is arithmetic on
+that assumption, not a measurement. Not modelled: PHY and data-length details, bursty radio errors, phone scheduling,
+iOS and Android differences, reconnect stages (folded into the drop window). No Bluetooth stack or hardware is involved,
+and the real transport (GATT service, Flutter client) is still to be built.

@@ -150,9 +150,10 @@ SCENARIOS = {
     "faults": Scenario("faults", "Fleet + faults: 20 % BLE loss, 10 min internet outage, GPS loss on 20 % of cars",
                        vetted=0.3, faults=Faults(ble_loss=0.2, outage=(600, 1200), gps_loss_cars=0.2,
                                                  beacon_loss=0.1)),
-    # BLE as it really works: a signed report (~700 bytes) is split into MTU-sized fragments, the report is lost if any
-    # fragment is, the device resends after an ack timeout, and the link drops for 30 s mid-run (bounded device queue).
-    "ble_fragmented": Scenario("ble_fragmented", "Fleet + fragmented BLE (MTU 185, 2 % fragment loss, 30 s link drop, retries)",
+    # Fragmented BLE: a signed report (~700 bytes) is split into MTU-sized fragments sent at connection events, a message
+    # ack makes the device resend, and the link drops for 30 s mid-run (bounded device queue). The 2 % fragment loss is a
+    # SYNTHETIC stress value (BLE's link layer retransmits; real losses come from drops and overflow), not a measurement.
+    "ble_fragmented": Scenario("ble_fragmented", "Fleet + fragmented BLE (MTU 185, 2 % synthetic fragment loss, 30 s link drop, retries)",
                                vetted=0.3, opt_in=True,
                                faults=Faults(ble=BleConfig(mtu=185, fragment_loss=0.02, ack_loss=0.05,
                                                            disconnects=((300.0, 330.0),)))),
@@ -296,6 +297,8 @@ def prepare(scn: Scenario, seed: int, utc0: float = UTC0, camera: str = "assumed
                 if scn.faults.outage and scn.faults.outage[0] <= t_up < scn.faults.outage[1]:
                     t_up = scn.faults.outage[1] + rng.uniform(0, 30)
                 events.append((t_up, "report", d.payload.decode()))
+                if rng.random() < 0.05:                                       # phone upload timeout: sent again (unchanged)
+                    events.append((t_up + rng.uniform(1, 5), "report", d.payload.decode()))
             reports = []                                                      # handled; skip the coin-flip loop below
         for t_emit, line in reports:
             if rng.random() < scn.faults.ble_loss:

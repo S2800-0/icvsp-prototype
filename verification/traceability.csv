@@ -190,7 +190,7 @@ S-07,Component,sil/test_ble_link.py,Fragmenting.test_roundtrip_with_reordered_an
 S-08,Component,sil/test_ble_link.py,Fragmenting.test_incomplete_message_is_dropped_after_the_timeout,(supporting)
 S-09,System,sil/test_ble_link.py,RealReportsSurviveTheLink.test_delivered_bytes_are_identical_and_the_signature_still_verifies,FR-SEC-05
 S-10,System,sil/test_ble_link.py,RealReportsSurviveTheLink.test_a_changed_fragment_breaks_the_signature,FR-SEC-05
-S-11,System,sil/test_ble_link.py,RealReportsSurviveTheLink.test_lost_ack_gives_duplicates_the_backend_must_ignore,FR-06 FR-SEC-10
+S-11,Component,sil/test_ble_link.py,RealReportsSurviveTheLink.test_lost_ack_gives_duplicates_the_backend_must_ignore,(supporting)
 S-12,Component,sil/test_ble_link.py,LossAndDelay.test_default_mtu_is_far_more_fragile_than_a_negotiated_mtu,(supporting)
 S-13,Component,sil/test_ble_link.py,LossAndDelay.test_simulated_report_loss_matches_the_analytic_rate,(supporting)
 S-14,Component,sil/test_ble_link.py,LossAndDelay.test_retries_recover_most_losses_at_the_cost_of_the_ack_timeout,(supporting)
@@ -199,4 +199,10 @@ S-16,Component,sil/test_ble_link.py,LinkDrop.test_queue_overflow_drops_the_oldes
 S-17,Component,sil/test_ble_link.py,LinkDrop.test_same_seed_gives_the_same_run,(supporting)
 S-18,System,sil/test_ble_link.py,WholeChainOverFragmentedBle.test_reports_reach_the_backend_and_none_is_corrupted,FR-SEC-05 FR-SEC-03
 S-19,System,sil/test_ble_link.py,WholeChainOverFragmentedBle.test_lost_ack_duplicates_are_recognised_not_double_counted,FR-06 FR-SEC-10
+S-20,Component,sil/test_ble_link.py,Fragmenting.test_parameters_are_validated,(supporting)
+S-21,Component,sil/test_ble_link.py,LossAndDelay.test_partial_fragments_are_kept_across_attempts,(supporting)
+S-22,Component,sil/test_ble_link.py,Scheduling.test_simultaneous_reports_share_the_connection_event_capacity,(supporting)
+S-23,Component,sil/test_ble_link.py,Scheduling.test_arrivals_keep_the_send_order_and_time_never_goes_backwards,(supporting)
+S-24,Component,sil/test_ble_link.py,Scheduling.test_default_baseline_has_no_residual_loss,(supporting)
+S-25,Component,sil/test_ble_link.py,LinkDrop.test_transmission_in_flight_when_the_link_drops_resumes_after_reconnect,(supporting)
 E-07,System,sil/run_sil.py,"Whole-chain simulation, 40 cars, 4 scenarios (new devices, fleet, faults, attacks)",FR-15 FR-16 FR-18 NFR-03 NFR-05

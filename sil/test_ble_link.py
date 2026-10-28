@@ -43,6 +43,17 @@ class Fragmenting(unittest.TestCase):
         self.assertIsNone(ra.push(10.0, frags[-1]))
 
 
+    def test_parameters_are_validated(self):
+        for bad in (dict(mtu=7), dict(mtu=3), dict(conn_interval_s=0), dict(notifs_per_event=0), dict(jitter_s=0.05),
+                    dict(fragment_loss=1.5), dict(max_attempts=0), dict(queue_limit=0),
+                    dict(disconnects=((5.0, 6.0), (1.0, 2.0)))):
+            with self.assertRaises(ValueError):
+                BleConfig(**bad)
+        with self.assertRaises(ValueError):
+            fragment_count(10_000, 23)                       # more than 255 fragments
+        self.assertEqual(fragment_count(len(REPORTS[0]), 517), 2)   # value capped at the 512-byte ATT limit
+
+
 class RealReportsSurviveTheLink(unittest.TestCase):
     def test_delivered_bytes_are_identical_and_the_signature_still_verifies(self):
         res = BleLink(BleConfig(fragment_loss=0.0), seed=1).simulate([(100.0, REPORTS[0]), (110.0, REPORTS[1])])
@@ -68,7 +79,7 @@ class RealReportsSurviveTheLink(unittest.TestCase):
 
 
 class LossAndDelay(unittest.TestCase):
-    def test_default_mtu_is_far_more_fragile_than_a_negotiated_mtu(self):
+    def test_default_mtu_is_far_more_fragile_than_a_negotiated_mtu(self):   # synthetic 2 % fragment erasure
         small = report_loss_probability(0.02, fragment_count(len(REPORTS[0]), 23))
         big = report_loss_probability(0.02, fragment_count(len(REPORTS[0]), 247))
         self.assertAlmostEqual(small, 0.6, delta=0.05)
@@ -89,6 +100,35 @@ class LossAndDelay(unittest.TestCase):
         self.assertTrue(late and all(d.t_arrival - d.t_sent >= 1.0 for d in late))
 
 
+    def test_partial_fragments_are_kept_across_attempts(self):
+        cfg = BleConfig(mtu=185, fragment_loss=0.3, max_attempts=2, ack_timeout_s=0.5)
+        res = BleLink(cfg, seed=8).simulate([(i * 10.0, REPORTS[0]) for i in range(3000)])
+        delivered = len({d.index for d in res.deliveries}) / 3000
+        n = fragment_count(len(REPORTS[0]), 185)
+        self.assertAlmostEqual(delivered, (1 - 0.3 ** 2) ** n, delta=0.03)                  # about 0.69
+        self.assertGreater(delivered, 1 - report_loss_probability(0.3, n, 2) + 0.15)        # not the 0.42 of fresh attempts
+
+
+class Scheduling(unittest.TestCase):
+    def test_simultaneous_reports_share_the_connection_event_capacity(self):
+        cfg = BleConfig(mtu=185, fragment_loss=0.0, jitter_s=0.0, notifs_per_event=4)
+        res = BleLink(cfg, seed=1).simulate([(0.0, REPORTS[0])] * 10)
+        arrivals = [d.t_arrival for d in res.deliveries]
+        self.assertEqual(arrivals, sorted(arrivals))
+        self.assertGreaterEqual(max(arrivals), (10 * fragment_count(len(REPORTS[0]), 185) / 4 - 1) * cfg.conn_interval_s - 1e-9)
+        self.assertGreaterEqual(len({round(a, 6) for a in arrivals}), 9)
+
+    def test_arrivals_keep_the_send_order_and_time_never_goes_backwards(self):
+        res = BleLink(BleConfig(mtu=23, fragment_loss=0.0, jitter_s=0.02), seed=2).simulate([(i * 0.05, REPORTS[i % 2]) for i in range(8)])
+        self.assertEqual([d.index for d in res.deliveries], list(range(8)))
+        self.assertTrue(all(a.t_arrival <= b.t_arrival for a, b in zip(res.deliveries, res.deliveries[1:])))
+
+    def test_default_baseline_has_no_residual_loss(self):
+        res = BleLink(BleConfig(), seed=9).simulate([(i * 2.0, REPORTS[i % 2]) for i in range(500)])
+        self.assertFalse(res.lost)
+        self.assertTrue(all(d.attempt == 1 for d in res.deliveries) and len(res.deliveries) == 500)
+
+
 class LinkDrop(unittest.TestCase):
     def test_reports_are_buffered_in_order_and_flushed_after_reconnect(self):
         cfg = BleConfig(fragment_loss=0.0, disconnects=((100.0, 160.0),), queue_limit=16)
@@ -102,6 +142,13 @@ class LinkDrop(unittest.TestCase):
         res = BleLink(cfg, seed=7).simulate([(float(t), REPORTS[0]) for t in (10, 20, 30, 40)])
         self.assertEqual(sorted(l.index for l in res.lost), [0, 1])
         self.assertEqual([d.index for d in res.deliveries], [2, 3])
+
+    def test_transmission_in_flight_when_the_link_drops_resumes_after_reconnect(self):
+        cfg = BleConfig(mtu=23, fragment_loss=0.0, jitter_s=0.0, notifs_per_event=4, disconnects=((0.15, 5.0),))
+        res = BleLink(cfg, seed=3).simulate([(0.0, REPORTS[0])])           # 45 fragments: the drop hits mid-message
+        self.assertFalse(res.lost)
+        self.assertEqual(res.deliveries[0].payload, REPORTS[0])
+        self.assertGreaterEqual(res.deliveries[0].t_arrival, 5.0)
 
     def test_same_seed_gives_the_same_run(self):
         msgs = [(i * 3.0, REPORTS[i % 2]) for i in range(200)]
@@ -128,7 +175,16 @@ class WholeChainOverFragmentedBle(unittest.TestCase):
         self.assertEqual(rep["rejected"], {})             # fragments are re-assembled byte for byte: no signature failures
 
     def test_lost_ack_duplicates_are_recognised_not_double_counted(self):
-        self.assertGreaterEqual(self.r["reports"]["duplicate"], 1)
+        import json
+        import run_sil
+        scn = run_sil.SCENARIOS["ble_fragmented"]
+        run = run_sil.prepare(scn, seed=5)
+        sent = [json.loads(p)["msg_id"] for _, k, p in run.events if k == "report"]
+        distinct = len(set(sent))
+        rep = self.r["reports"]
+        self.assertGreater(len(sent), distinct)                      # copies exist (lost acks, phone upload resends)
+        self.assertEqual(rep["accepted"], distinct)                   # each distinct report counted exactly once
+        self.assertEqual(rep["duplicate"], len(sent) - distinct)      # every extra copy recognised as a duplicate
 
 
 if __name__ == "__main__":
