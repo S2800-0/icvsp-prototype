@@ -58,3 +58,18 @@ road, the cars, the true hazards next to the trust engine's decisions (advisory 
 its reasons), device reliability, and every report, rejection and warning check as it happens. Buttons on the
 page launch extra attacks (replay, tampering, unregistered device, a new device inventing a pothole, a Sybil
 group) so the answer of the backend and the trust engine can be shown live.
+
+## BLE link model (`ble_link.py`, opt-in scenario `ble_fragmented`)
+
+The default scenarios treat the device-to-phone Bluetooth link as one coin flip per report (`ble_loss`). A real link is
+not like that: a signed report is about 700 bytes, but one BLE notification carries `ATT_MTU - 3` bytes (20 at the
+default MTU 23, about 180 to 240 once the MTU is negotiated), so every report travels as 3 to 45 fragments and is lost
+if any fragment is. `ble_link.py` models fragmenting and re-assembly, per-fragment loss, delay (connection events),
+link drops with a bounded device queue, a message-level ack with retries, and duplicates when the ack is lost.
+
+    python3 sil/run_sil.py --scenario ble_fragmented     # not part of `--scenario all` (keeps the recorded results)
+    python3 -m pytest sil/test_ble_link.py -v
+
+At 2 % fragment loss the report loss per attempt is about 60 % at MTU 23 (45 fragments) and about 6 % at MTU 247 (3
+fragments): negotiate a large MTU and let the device retry. This is a model of the radio, not a radio test: no
+Bluetooth hardware or stack is involved, and the real transport (GATT service, Flutter client) is still to be built.

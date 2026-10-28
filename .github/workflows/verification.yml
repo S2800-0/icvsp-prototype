@@ -113,7 +113,7 @@ jobs:
           python-version: "3.12"
       - run: pip install pytest cryptography fastapi httpx
       - name: 40 simulated cars with faults and attackers (real device code, real backend)
-        run: python -m pytest sil/test_sil.py -v --junitxml=sil.xml
+        run: python -m pytest sil/test_sil.py sil/test_ble_link.py -v --junitxml=sil.xml
       - uses: actions/upload-artifact@v6
         if: always()
         with: {name: results-sil, path: sil.xml}

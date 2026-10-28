@@ -185,4 +185,18 @@ S-02,System,sil/test_sil.py,WholeChain.test_invented_hazards_never_reach_warning
 S-03,System,sil/test_sil.py,WholeChain.test_tampered_unknown_and_revoked_reports_are_refused,FR-SEC-03 FR-SEC-07 FR-SEC-12
 S-04,System,sil/test_sil.py,WholeChain.test_replayed_report_has_no_effect,FR-06 FR-SEC-10
 S-05,System,sil/test_sil.py,WholeChain.test_device_emits_within_the_fusion_window,(supporting)
+S-06,Component,sil/test_ble_link.py,Fragmenting.test_real_reports_need_many_fragments_at_the_default_mtu,(supporting)
+S-07,Component,sil/test_ble_link.py,Fragmenting.test_roundtrip_with_reordered_and_duplicate_fragments,(supporting)
+S-08,Component,sil/test_ble_link.py,Fragmenting.test_incomplete_message_is_dropped_after_the_timeout,(supporting)
+S-09,System,sil/test_ble_link.py,RealReportsSurviveTheLink.test_delivered_bytes_are_identical_and_the_signature_still_verifies,FR-SEC-05
+S-10,System,sil/test_ble_link.py,RealReportsSurviveTheLink.test_a_changed_fragment_breaks_the_signature,FR-SEC-05
+S-11,System,sil/test_ble_link.py,RealReportsSurviveTheLink.test_lost_ack_gives_duplicates_the_backend_must_ignore,FR-06 FR-SEC-10
+S-12,Component,sil/test_ble_link.py,LossAndDelay.test_default_mtu_is_far_more_fragile_than_a_negotiated_mtu,(supporting)
+S-13,Component,sil/test_ble_link.py,LossAndDelay.test_simulated_report_loss_matches_the_analytic_rate,(supporting)
+S-14,Component,sil/test_ble_link.py,LossAndDelay.test_retries_recover_most_losses_at_the_cost_of_the_ack_timeout,(supporting)
+S-15,Component,sil/test_ble_link.py,LinkDrop.test_reports_are_buffered_in_order_and_flushed_after_reconnect,(supporting)
+S-16,Component,sil/test_ble_link.py,LinkDrop.test_queue_overflow_drops_the_oldest_reports,(supporting)
+S-17,Component,sil/test_ble_link.py,LinkDrop.test_same_seed_gives_the_same_run,(supporting)
+S-18,System,sil/test_ble_link.py,WholeChainOverFragmentedBle.test_reports_reach_the_backend_and_none_is_corrupted,FR-SEC-05 FR-SEC-03
+S-19,System,sil/test_ble_link.py,WholeChainOverFragmentedBle.test_lost_ack_duplicates_are_recognised_not_double_counted,FR-06 FR-SEC-10
 E-07,System,sil/run_sil.py,"Whole-chain simulation, 40 cars, 4 scenarios (new devices, fleet, faults, attacks)",FR-15 FR-16 FR-18 NFR-03 NFR-05

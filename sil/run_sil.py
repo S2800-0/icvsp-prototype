@@ -31,6 +31,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 from fastapi.testclient import TestClient  # noqa: E402
 
+from ble_link import BleConfig, BleLink  # noqa: E402
 from icvsp_backend.app import create_app  # noqa: E402
 from icvsp_backend.auth import issue_dev_token  # noqa: E402
 from icvsp_backend.store import Store  # noqa: E402
@@ -128,6 +129,7 @@ class Faults:
     outage: tuple | None = None        # (start, end) seconds from the start: phones have no internet
     gps_loss_cars: float = 0.0         # share of cars with a 10 s GPS outage
     beacon_loss: float = 0.01
+    ble: "BleConfig | None" = None     # opt-in fragment-level BLE model (sil/ble_link.py); None keeps the old coin flip
 
 
 @dataclass
@@ -139,6 +141,7 @@ class Scenario:
     vetted: float = 0.0                # share of devices provisioned with a starting history
     faults: Faults = field(default_factory=Faults)
     attacks: bool = False
+    opt_in: bool = False               # not part of `--scenario all` (keeps the recorded results unchanged)
 
 
 SCENARIOS = {
@@ -147,6 +150,12 @@ SCENARIOS = {
     "faults": Scenario("faults", "Fleet + faults: 20 % BLE loss, 10 min internet outage, GPS loss on 20 % of cars",
                        vetted=0.3, faults=Faults(ble_loss=0.2, outage=(600, 1200), gps_loss_cars=0.2,
                                                  beacon_loss=0.1)),
+    # BLE as it really works: a signed report (~700 bytes) is split into MTU-sized fragments, the report is lost if any
+    # fragment is, the device resends after an ack timeout, and the link drops for 30 s mid-run (bounded device queue).
+    "ble_fragmented": Scenario("ble_fragmented", "Fleet + fragmented BLE (MTU 185, 2 % fragment loss, 30 s link drop, retries)",
+                               vetted=0.3, opt_in=True,
+                               faults=Faults(ble=BleConfig(mtu=185, fragment_loss=0.02, ack_loss=0.05,
+                                                           disconnects=((300.0, 330.0),)))),
     "attacks": Scenario("attacks", "Fleet + attacks: fake reporter, 5 Sybil identities, replay, tampering, "
                                    "unregistered and revoked devices", vetted=0.3, attacks=True),
 }
@@ -276,6 +285,18 @@ def prepare(scn: Scenario, seed: int, utc0: float = UTC0, camera: str = "assumed
         emitted[car.vid] = reports
         if reports:
             events.append((-1.0, "register", (car.vid, json.loads(reports[0][1])["public_key"], car.vid in vetted)))
+        if scn.faults.ble is not None:
+            # report -> fragments -> radio (loss, delay, link drop, retries) -> phone -> internet
+            link = BleLink(scn.faults.ble, seed=rng.getrandbits(32))
+            ble = link.simulate([(t, line.encode()) for t, line in reports])
+            for lost in ble.lost:
+                events.append((reports[lost.index][0], "lost", car.vid))
+            for d in ble.deliveries:
+                t_up = d.t_arrival + rng.uniform(*scn.faults.upload_delay_s)
+                if scn.faults.outage and scn.faults.outage[0] <= t_up < scn.faults.outage[1]:
+                    t_up = scn.faults.outage[1] + rng.uniform(0, 30)
+                events.append((t_up, "report", d.payload.decode()))
+            reports = []                                                      # handled; skip the coin-flip loop below
         for t_emit, line in reports:
             if rng.random() < scn.faults.ble_loss:
                 events.append((t_emit, "lost", car.vid))
@@ -488,7 +509,7 @@ def main() -> None:
                     help="camera model profile (hit and false-report rates measured on held-out video)")
     a = ap.parse_args()
     build()
-    names = list(SCENARIOS) if a.scenario == "all" else [a.scenario]
+    names = [n for n, sc in SCENARIOS.items() if not sc.opt_in] if a.scenario == "all" else [a.scenario]
     rows = []
     for n in names:
         scn = SCENARIOS[n]
